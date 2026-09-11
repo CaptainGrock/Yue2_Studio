@@ -1,4 +1,4 @@
-# YuE2 Studio
+# YuE2 Studio · Beta
 
 A local HTML/CSS/JavaScript music studio backed by the installed Python engines. No Gradio,
 Node build, CDN, or additional runtime Python packages are needed.
@@ -25,6 +25,26 @@ worker, the engine checks compiled Flash Attention availability, using cuDNN att
 when supported (otherwise SDPA) when Flash Attention is missing. `torch-eager` remains an
 explicit, slower troubleshooting option. Older saved drafts keep their selection;
 choose **Advanced settings → Inference backend → torch** to restore fast generation.
+
+## Choose an engine and GPU memory preset
+
+![Music engine selector](../images/music-engine.png)
+
+Choose **Torch** for the native engine, or **GGUF** for audio.cpp. Switching keeps
+your current song. GGUF needs a compatible engine and its separate model files.
+
+![Open GGUF setup and model downloads](../images/gguf-setup-button.png)
+
+Click **Set up GGUF / Models**, or **Music models** in the sidebar, to check engine
+setup, download Q4/Q8/BF16 bundles, and select an installed model. See the
+[GGUF setup guide](gguf.md) for requirements and experimental limitations.
+
+![GPU memory preset and effective memory summary](../images/gpu-memory-preset.png)
+
+Choose **Auto**, a GPU capacity, or **Custom**. Native presets set the Torch budget,
+offloading, and automatic VAE tiles. GGUF shows a model suggestion instead of using
+the Torch budget. Read the [preset table and limits](settings.md#gpu-memory-presets).
+The screenshot shows Custom because the memory controls were adjusted manually.
 
 ## Create music
 

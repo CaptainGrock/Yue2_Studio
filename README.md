@@ -1,8 +1,12 @@
-# YuE2 Studio
+# YuE2 Studio · Beta
 
 A local web studio for **YuE2** with original songs, melody covers, an LLM writing room,
 automatic song batches, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
 no Gradio, Node build, or extra runtime Python dependencies beyond the installed engines.
+
+**Beta preview:** tested on Windows with an RTX 5090. Other hardware configurations
+are still being validated. GGUF and lower-VRAM presets remain experimental.
+Planned first release: `v0.1.0-beta.1`.
 
 ![YuE2 Studio with the song editor, navigation and LLM writing room](images/studio-overview.png)
 
@@ -170,5 +174,13 @@ The server is local-only; cloning gives each user their own studio, not access t
 | Writing room | Review your draft | Surprise me |
 | --- | --- | --- |
 | ![Describe a song idea](images/writing-room.png) | ![Edit and apply generated lyrics](images/review-draft.png) | ![Automatic song batches](images/surprise-me.png) |
+
+### Engine and memory controls
+
+![Main music engine selector](images/music-engine.png)
+
+![GGUF setup and model downloads button](images/gguf-setup-button.png)
+
+![GPU memory preset with the effective budget](images/gpu-memory-preset.png)
 
 Click any screenshot to see it full size. The [illustrated guide](docs/studio.md) walks through each screen.
