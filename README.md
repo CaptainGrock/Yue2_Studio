@@ -90,6 +90,12 @@ are needed. Paths are resolved locally; this repository includes no weights.
 
 ## Choose your music engine
 
+> **GGUF requires a separate audio.cpp installation.** Studio can download GGUF
+> model files, but it **does not install or build the audio.cpp engine**. Install
+> a Yue2-capable audio.cpp executable outside Studio, then connect it in the model
+> panel. Downloading a model alone is not enough to generate with GGUF.
+> **Torch users do not need audio.cpp.** [Engine installation instructions](docs/gguf.md#1-obtain-audiocpp-with-yue2-support).
+
 Switch **Torch / GGUF** using **Music engine** above the song editor. Open
 **Set up GGUF / Models** (also in the sidebar as **Music models**) to download Q4,
 Q8, or BF16 bundles with their decoder and supporting files. The panel shows

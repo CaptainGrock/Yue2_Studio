@@ -32,6 +32,8 @@ choose **Advanced settings → Inference backend → torch** to restore fast gen
 
 Choose **Torch** for the native engine, or **GGUF** for audio.cpp. Switching keeps
 your current song. GGUF needs a compatible engine and its separate model files.
+**Install or build audio.cpp separately outside Studio. The UI downloads GGUF
+weights, not the audio.cpp executable.** Torch users do not need audio.cpp.
 
 ![Open GGUF setup and model downloads](../images/gguf-setup-button.png)
 

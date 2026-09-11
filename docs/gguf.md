@@ -6,6 +6,21 @@ FLAC for the existing player/library. The original WAV is retained in artifacts.
 The same queue and process-tree cancellation apply. Surprise me writes each song
 with your chosen LLM, then submits it to the selected engine.
 
+## Before you choose GGUF
+
+**The UI downloads model files only. It does not install or build audio.cpp.**
+
+| Component | How to install |
+| --- | --- |
+| YuE2 and its Python environment | Follow upstream installation before adding Studio |
+| audio.cpp engine / executable | Install or build separately outside the UI; [instructions below](#1-obtain-audiocpp-with-yue2-support) |
+| GGUF main model, F16 decoder, and sidecars | Download from Studio's Music models panel |
+
+After installing audio.cpp, open **Music models**, enter its executable path (or
+use automatic detection), and click **Apply engine path**. Download your model
+bundle and click **Use model**. Both the engine and model files must be present
+before GGUF can generate a song. Torch does not require audio.cpp.
+
 ## Status and requirements
 
 The adapter follows audio.cpp dev commit
