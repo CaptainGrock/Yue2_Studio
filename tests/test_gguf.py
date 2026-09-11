@@ -6,10 +6,21 @@ from unittest.mock import patch
 
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from yue2_studio.settings import defaults
+from yue2_studio.settings import defaults, validate_settings
 from yue2_studio.gguf import SIDECARS,validate,prepare,run
 
 class GGUFTests(unittest.TestCase):
+ def test_saved_blank_executable_detects_local_build_without_replacing_explicit_path(self):
+  import os
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp)
+   executable=root/'tools/audio.cpp/build/windows-cuda-release/bin'/('audiocpp_cli.exe' if os.name=='nt' else 'audiocpp_cli')
+   executable.parent.mkdir(parents=True);executable.write_bytes(b'fixture')
+   with patch('yue2_studio.settings.ROOT',root):
+    self.assertEqual(validate_settings({'gguf':{'executable':''}})['gguf']['executable'],str(executable.resolve()))
+    self.assertEqual(validate_settings({'gguf':{'executable':'custom/path'}})['gguf']['executable'],'custom/path')
+    executable.unlink()
+    self.assertEqual(validate_settings({'gguf':{'executable':''}})['gguf']['executable'],'')
  def spec(self,root):
   executable=root/'audiocpp_cli.exe';executable.write_bytes(b'test fixture')
   models=root/'models';(models/'sidecars').mkdir(parents=True)

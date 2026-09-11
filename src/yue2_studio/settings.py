@@ -8,6 +8,16 @@ from pathlib import Path
 ROOT = Path(os.environ.get('YUE2_KIT', Path(__file__).resolve().parents[2])).resolve()
 
 
+def detected_gguf_executable():
+    name = 'audiocpp_cli.exe' if os.name == 'nt' else 'audiocpp_cli'
+    for checkout in (ROOT/'tools/audio.cpp', ROOT/'audio.cpp'):
+        for build in ('build/windows-cuda-release/bin', 'build/bin'):
+            candidate = checkout/build/name
+            if candidate.is_file():
+                return str(candidate.resolve())
+    return ''
+
+
 def field(key, label, default, note, *, kind=None, choices=None, minimum=None, maximum=None, step=None):
     return dict(key=key, label=label, default=default, note=note,
                 kind=kind or ('bool' if isinstance(default, bool) else 'number' if isinstance(default, (int, float)) else 'text'),
@@ -38,7 +48,7 @@ GROUPS = [
 ]
 
 GROUPS.append(dict(id='gguf', title='audio.cpp / GGUF', subtitle='Experimental alternative engine. Requires a Yue2-capable audio.cpp dev build, GGUF components and all four sidecars. PyTorch runtime controls do not apply.', fields=[
-    field('executable','audio.cpp executable','','Full path to audiocpp_cli.exe on Windows or audiocpp_cli on Linux. Use a build with Yue2 support from the audio.cpp dev branch. Studio does not install or download the binary.'),
+    field('executable','audio.cpp executable',detected_gguf_executable(),'Full path to audiocpp_cli.exe on Windows or audiocpp_cli on Linux. Blank automatically detects a build under tools/audio.cpp or audio.cpp in your YuE2 folder. Use a build with Yue2 support from the audio.cpp dev branch. Studio does not install or download the binary.'),
     field('model_dir','GGUF model folder',str(ROOT/'models/Yue2-3B-GGUF'),'Folder containing the main GGUF, VAE GGUF and sidecars subfolder. Download only the component precision you want plus all sidecars.'),
     field('model_gguf','Main GGUF','yue2-3b-q8_0.gguf','Q8 is the balanced default. Q4 uses smaller weights but is not necessarily faster or identical in quality. Paths are relative to the GGUF folder.',choices=['yue2-3b-q8_0.gguf','yue2-3b-q4_0.gguf','yue2-3b-bf16.gguf']),
     field('vae_gguf','GGUF decoder','yue2-vae-f16.gguf','F16 reduces VAE weight memory. F32 uses more memory. The GGUF decoder is separate from the PyTorch VAE.',choices=['yue2-vae-f16.gguf','yue2-vae-f32.gguf']),
@@ -148,4 +158,6 @@ def validate_settings(data):
         raise ValueError('Transcription requires 0 ≤ lookahead ≤ overlap < 300 seconds.')
     if transcription['preset']=='paper' and (overlap,lookahead)!=(100,0):
         raise ValueError('The paper transcription preset fixes overlap=100 and lookahead=0.')
+    if not result['gguf']['executable'].strip():
+        result['gguf']['executable'] = detected_gguf_executable()
     return result
