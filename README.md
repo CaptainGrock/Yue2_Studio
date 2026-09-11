@@ -94,6 +94,10 @@ Click **Use model**, then create songs with your own lyrics/style or Surprise me
 Engine installation instructions are included; audio.cpp itself is installed
 separately. [Setup and download guide](docs/gguf.md#easy-setup-from-the-main-page).
 
+The main page also offers **GPU memory presets**: Auto, 8/12/16/24/32 GB, and
+Custom. These set Torch budgets and offloading, and show separate GGUF model
+suggestions. [Preset values and limits](docs/settings.md#gpu-memory-presets).
+
 ## Experimental GGUF / lower-VRAM engine
 
 Studio also has an **audio.cpp** backend for [audio-cpp/Yue2-3B-GGUF](https://huggingface.co/audio-cpp/Yue2-3B-GGUF).

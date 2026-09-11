@@ -155,3 +155,33 @@ Runs in the separate SheetSage2 environment, one GPU job at a time.
 **Covers:** SheetSage2 has a separate Python environment and models. Check transcription paths and review generated ABC.
 
 **LLM returns clean lyrics:** use Require strong profanity for English lyrics or specify exact language and words in directions. The text check cannot guarantee audio intelligibility.
+
+
+## GPU memory presets
+
+The main page has **GPU memory preset** beside the engine controls. Selecting a
+capacity applies the following native runtime settings. Auto detects NVIDIA GPU 0
+and chooses the largest listed capacity that fits (allowing for reported capacity
+rounding). It never changes your engine, lyrics, sampling, or downloaded model.
+Choose manually for other GPUs/devices. Custom opens Advanced settings; changing
+memory controls there updates the main label to Custom unless they match a preset.
+
+| GPU capacity | Entered Torch budget | Maximum allocation after 2 GiB engine reserve | Offload AR |
+| --- | --- | --- | --- |
+| 8 GB | 6 GiB | 4 GiB | On |
+| 12 GB | 10 GiB | 8 GiB | On |
+| 16 GB | 14 GiB | 12 GiB | On |
+| 24 GB | 22 GiB | 20 GiB | Off |
+| 32 GB | 30 GiB | 28 GiB | Off |
+
+All presets reset VAE tile size to automatic. Physical GPU limits may lower the
+actual ceiling further. These are conservative starting budgets, not validated
+minimum-hardware guarantees. The native engine's supported baseline is 24 GiB;
+smaller presets may still fail and GGUF may be more appropriate. Offloading can
+increase runtime. Other applications and long songs can cause memory pressure.
+
+**GGUF does not use the Torch memory budget.** With GGUF selected, the summary
+suggests Q4 for 8 GB and Q8 for the larger listed capacities. Select the suggested
+model through Music models. The preset does not download/switch models or alter
+GGUF graph arenas, whose safe capacities depend on the runtime and request. The
+native budget is retained for when you switch back to Torch.

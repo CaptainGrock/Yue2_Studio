@@ -3,6 +3,7 @@ let musicModels=null,modelStatusBusy=false,modelSettingsKey='',modelRefreshTimer
 const modelBytes=n=>(n/1e9).toFixed(2)+' GB';
 function syncMusicEngine(){
   if(!state.boot)return;
+  syncGpuPreset();
   $('musicEngine').value=['torch','audio.cpp'].includes(state.settings.runtime.backend)?state.settings.runtime.backend:'';
   const key=JSON.stringify([state.settings.runtime.backend,state.settings.gguf]);
   if(key!==modelSettingsKey){modelSettingsKey=key;clearTimeout(modelRefreshTimer);if(state.settings.runtime.backend==='audio.cpp')$('musicEngineStatus').textContent='Checking GGUF setup…';modelRefreshTimer=setTimeout(refreshMusicModels,100);}
@@ -13,6 +14,7 @@ async function refreshMusicModels(){
   modelStatusBusy=true;
   try{
     musicModels=await api('/api/models');
+    syncGpuPreset();
     const snapshot=JSON.stringify(state.settings);
     const check=await api('/api/models/check',state.settings);
     if(snapshot===JSON.stringify(state.settings)&&state.settings.runtime.backend==='audio.cpp'){
@@ -54,6 +56,8 @@ async function openMusicModels(){
   $('modelsDialog').showModal();await refreshMusicModels();
 }
 function bindMusicModels(){
+  $('gpuPreset').onchange=applyGpuPreset;
+  $('gpuPresetDetails').onclick=()=>$('advancedButton').click();
   $('manageModels').onclick=openMusicModels;
   $('modelsNav').onclick=openMusicModels;
   $('doneModels').onclick=()=>$('modelsDialog').close();
@@ -71,4 +75,41 @@ function bindMusicModels(){
   };
   syncMusicEngine();refreshMusicModels();
   setInterval(()=>{if($('modelsDialog').open)refreshMusicModels();},1500);
+}
+
+// Capacity presets set native runtime controls only; GGUF arenas are independent.
+const GPU_CAPACITIES=[8,12,16,24,32];
+function gpuPresetValues(capacity){return {memory_budget_gib:capacity-2,offload_ar:capacity<=16,vae_core_frames:null};}
+function syncGpuPreset(){
+  const runtime=state.settings.runtime;
+  if(!runtime)return;
+  const matched=GPU_CAPACITIES.find(n=>{const p=gpuPresetValues(n);return Object.keys(p).every(k=>runtime[k]===p[k]);});
+  $('gpuPreset').value=matched?String(matched):'custom';
+  const gpu=musicModels?.gpu;
+  const detected=gpu?'Detected GPU 0: '+gpu.name+' · '+(gpu.memory_mib/1024).toFixed(1)+' GiB. ':'';
+  let note='Torch budget: '+runtime.memory_budget_gib+' GiB (allocation ceiling up to '+Math.max(0,runtime.memory_budget_gib-2)+' GiB after the engine reserve). Offload '+(runtime.offload_ar?'on':'off')+'. ';
+  if(state.settings.runtime.backend==='audio.cpp')note='GGUF does not use the Torch budget. '+(matched?'Suggested model: '+(matched<=8?'Q4':'Q8')+'. ':'Choose a capacity for a model suggestion. ')+'Use Music models to select it; GGUF arena settings are unchanged. ';
+  else if(matched&&matched<24)note+='Below the native 24 GiB baseline; try GGUF if it cannot fit. ';
+  $('gpuPresetSummary').textContent=detected+note+'Other GPU apps and song length affect memory use.';
+}
+async function applyGpuPreset(){
+  const choice=$('gpuPreset').value;
+  if(choice==='custom'){
+    $('advancedButton').click();syncGpuPreset();return;
+  }
+  try{
+    let capacity=Number(choice);
+    if(choice==='auto'){
+      if(!musicModels)musicModels=await api('/api/models');
+      if(!musicModels.gpu)throw Error('GPU memory could not be detected. Choose your capacity manually.');
+      if(!['auto','cuda','cuda:0'].includes(state.settings.runtime.device))throw Error('Auto detects GPU 0 only. Choose the capacity for your selected compute device manually.');
+      const detected=musicModels.gpu.memory_mib/1024;
+      capacity=GPU_CAPACITIES.filter(n=>n<=detected+0.5).at(-1);
+      if(!capacity)throw Error('This GPU is below the available presets. Use Custom settings.');
+    }
+    if(!GPU_CAPACITIES.includes(capacity))throw Error('Unsupported GPU preset.');
+    const next=clone(state.settings);Object.assign(next.runtime,gpuPresetValues(capacity));
+    state.settings=(await api('/api/settings/validate',next)).settings;save();
+    toast(capacity+' GB preset applied. '+(state.settings.runtime.backend==='audio.cpp'?'GGUF memory controls are separate.':'Review the memory summary below the selector.'));
+  }catch(e){feedbackError(e);syncGpuPreset();}
 }
