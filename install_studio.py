@@ -20,7 +20,8 @@ def install(target, check=False):
     metadata = project.read_text(encoding='utf-8')
     if not re.search(r'name\s*=\s*"yue2-infer"',metadata) or not re.search(r'version\s*=\s*"0\.1\.6"',metadata):
         raise ValueError('This add-on is tested with yue2-infer 0.1.6. See README compatibility instructions.')
-    files = [REPO/'launch_studio.py', REPO/'src/yue2/cuda_graph.py', REPO/'docs/studio.md']
+    files = [REPO/'launch_studio.py', REPO/'src/yue2/cuda_graph.py', REPO/'docs/studio.md', REPO/'docs/settings.md']
+    files.extend(sorted((REPO/'images').glob('*.png')))
     for base in ('src/yue2_studio','skills/yue2-music/scripts'):
         files.extend(p for p in (REPO/base).rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix in {'.py','.json','.md','.html','.js','.css','.svg'})
     changes=[]

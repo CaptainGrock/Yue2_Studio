@@ -4,6 +4,10 @@ A local web studio for **YuE2** with original songs, melody covers, an LLM writi
 automatic song batches, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
 no Gradio, Node build, or extra runtime Python dependencies beyond the installed engines.
 
+![YuE2 Studio with the song editor, navigation and LLM writing room](images/studio-overview.png)
+
+*Write lyrics, shape a style, and generate music in one local workspace. See the [illustrated guide](docs/studio.md) for each part of the UI.*
+
 ## 1. Install YuE2 first
 
 Follow the **[official YuE2 installation and quick start](https://github.com/multimodal-art-projection/YuE#quick-start)**.

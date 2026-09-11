@@ -2,6 +2,10 @@
 
 Defaults favor the fast validated execution path. Speed, memory, output length and musical quality are different controls; a smaller token ceiling can cut a song off.
 
+![Searchable advanced settings panel with model paths and field explanations](../images/advanced-settings.png)
+
+*The screenshot shows example paths, not required folder locations. Your defaults resolve against your own YuE2 installation.*
+
 ## Everyday controls
 
 - **Full / melody / off:** full plans harmony and melody, melody plans lead melody, off skips score planning. Off avoids planner time but changes conditioning.

@@ -28,6 +28,10 @@ choose **Advanced settings → Inference backend → torch** to restore fast gen
 
 ## Create music
 
+![New song editor with musical style, lyrics and section-tag shortcuts](../images/new-song.png)
+
+*Start with a style and sung lyrics. Use the section buttons to insert cues such as [Verse] and [Chorus].*
+
 1. Choose **New song**. Give it an optional title.
 2. Put language, genre, vocal character, instruments, groove and intended BPM in **Musical style**.
 3. Write lyrics, or use the writing assistant. Insert section tags at the cursor. The native engine
@@ -42,6 +46,10 @@ instead of calling a capped result a complete musical performance. All default s
 32 midpoint synthesis steps are preserved.
 
 ## Surprise me and automatic batches
+
+![Surprise me controls for song count, vocal gender, style, profanity and language](../images/surprise-me.png)
+
+*Choose how many songs to create and the constraints each song should follow. The screenshot shows three female-led punk rock songs with required profanity.*
 
 In the writing room, **Surprise me** invents a title, full lyrics and musical style, then immediately
 renders the song. Choose **Number of songs** (1–50), **Vocal gender**, optional **Style direction**, and
@@ -62,6 +70,10 @@ never in the saved batch or song files. Restarted batches are marked interrupted
 
 ## Covers
 
+![Cover editor with source audio upload and melody transcription controls](../images/create-cover.png)
+
+*Upload a source recording, transcribe and review its melody, then enter the new style and lyrics.*
+
 1. Choose **Create a cover** and upload a source recording, or import a native ABC score directly.
 2. **Transcribe melody** runs the installed `SheetSage2-venv` interpreter and models. This is a real
    transcription job in the same serial GPU queue used by music generation.
@@ -77,6 +89,10 @@ This is symbolic melody conditioning. It does not clone singer identity, preserv
 lyric recognition, or provide exact acoustic note alignment. Review transcription and listen to the result.
 
 ## LLM Runner
+
+![LLM Runner provider selector, masked API key, model list and connection controls](../images/llm-runner.png)
+
+*Select your provider and model, enter your own API key, and test the connection. Model availability depends on the selected provider and your account.*
 
 Open **LLM Runner**, choose a provider, enter your API key, and **Refresh models**. The studio includes
 the text-model starter lists inspected in your video builder's `LLM.py`; these are clearly labeled
@@ -109,6 +125,10 @@ rendering music when memory is tight. No LLM weights are downloaded automaticall
 
 ### Songwriting
 
+![Writing room with song brief and lyrics plus musical style selected](../images/writing-room.png)
+
+*Describe your idea and choose what the assistant should write. Create draft returns editable text for review.*
+
 The writing room can create lyrics + style, write only lyrics, describe only a style, review a draft,
 or adapt words for a cover. Current lyrics, style, optional ABC, and the brief are sent as context.
 Every result is previewed in editable fields. Applying a draft is explicit; a late response never
@@ -120,7 +140,17 @@ natural stress, syllable balance, breath space, genre-appropriate rhyme, chorus 
 complete chorus repeats, and a final quality pass. Custom writing preferences are appended separately.
 The format follows the [official Yue2 music skill](https://github.com/multimodal-art-projection/YuE/tree/main/skills/yue2-music).
 
+### Review and apply a draft
+
+![Editable generated title, style and section-tagged lyrics with apply controls](../images/review-draft.png)
+
+Edit the title, style and lyrics before applying. **Apply draft** uses the whole draft; **Use lyrics** and **Use style** transfer only the selected part. Review writing notes if provided.
+
 ## Settings and storage
+
+![Advanced settings with searchable groups and detailed model controls](../images/advanced-settings.png)
+
+*Search the settings or switch groups. Paths shown here are examples from the screenshot; your installation uses its own paths. See the [full settings reference](settings.md) for every control.*
 
 Advanced settings has searchable, detailed notes and default values for every exposed native
 generation setting: models/revisions, device, memory, backend, quantization, offload, offline loading,
