@@ -3,7 +3,7 @@ let musicModels=null,modelStatusBusy=false,modelSettingsKey='',modelRefreshTimer
 const modelBytes=n=>(n/1e9).toFixed(2)+' GB';
 function syncMusicEngine(){
   if(!state.boot)return;
-  $('musicEngine').value=state.settings.runtime.backend;
+  $('musicEngine').value=['torch','audio.cpp'].includes(state.settings.runtime.backend)?state.settings.runtime.backend:'';
   const key=JSON.stringify([state.settings.runtime.backend,state.settings.gguf]);
   if(key!==modelSettingsKey){modelSettingsKey=key;clearTimeout(modelRefreshTimer);if(state.settings.runtime.backend==='audio.cpp')$('musicEngineStatus').textContent='Checking GGUF setup…';modelRefreshTimer=setTimeout(refreshMusicModels,100);}
   if(state.settings.runtime.backend!=='audio.cpp')$('musicEngineStatus').textContent=state.settings.runtime.backend==='torch'?'Original engine · full score tools available':state.settings.runtime.backend+' · advanced engine';
