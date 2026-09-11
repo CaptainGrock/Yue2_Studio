@@ -95,8 +95,9 @@ configure the **audio.cpp / GGUF** group. `torch` stays the overall default.
 Original songs, supplied-ABC covers, Surprise me and audio downloads use the same UI.
 Plan-only output and generated ABC export currently require torch. GGUF outputs are
 marked for review because the CLI does not return structured truncation flags.
-This adapter is contract-tested with mocked CLI output; an actual GGUF render has
-not yet been validated here. See the [setup, limitations and memory guide](docs/gguf.md).
+Q8 + F16 CUDA generation has been tested on Windows with an RTX 5090; Q4 and other
+devices remain unvalidated locally. See the [setup, test steps, limitations and
+memory guide](docs/gguf.md) for the measured result and its limits.
 
 ## Speed defaults
 

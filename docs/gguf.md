@@ -13,7 +13,15 @@ The adapter follows audio.cpp dev commit
 [Yue2 runtime documentation](https://github.com/0xShug0/audio.cpp/blob/fbe3eedbf6c504e45189e2cdcf1b257740a28863/docs/models/yue2.md).
 It is experimental. Automated tests verify request mapping, full-range seeds,
 Unicode/long lyrics, asset preflight, WAV/FLAC handling and review receipts using
-a mocked executable. **A real GGUF generation has not been validated locally.**
+a mocked executable. **Real Q8_0 + F16 CUDA generation was validated locally on
+Windows with an RTX 5090 on September 11, 2026**, using the pinned source above.
+One short `full` planning request at 32 ODE steps and the normal 9,000 semantic-token
+ceiling produced 60.76 seconds of stereo 48 kHz audio in 20.17 seconds including
+worker startup and output conversion. Peak sampled **total device memory** was
+7,627 MiB, including desktop applications. This is one test, not a speed or memory
+guarantee; it does not establish lyric accuracy or musical quality. WAV and FLAC
+decoded successfully with finite, non-silent samples. Q4 and other devices remain
+untested locally.
 The model card describes this dev branch as community testing/validation work.
 
 Studio still requires the original YuE2 environment for its shared protocol,
@@ -74,6 +82,26 @@ The model card lists Q4_0, Q8_0 and BF16 mains, and F16/F32 VAEs.
 5. Keep the existing synthesis/sampling controls or adjust them deliberately.
 6. Apply settings and create a song. Missing files are rejected before a render
    is queued; Surprise me checks the files before calling its LLM.
+
+### First test
+
+Start with **one normal song**, before trying a Surprise me batch:
+
+- Select Q8_0, F16 decoder, CUDA, and Full planning. Keep 32 synthesis steps and
+  default sampling settings.
+- Enter a short verse and outro with section tags, plus a simple style such as
+  `English, female vocals, acoustic folk, gentle guitar, warm, intimate`.
+- Generate and open the queued run. The elapsed-time heartbeat confirms the worker
+  is active; native builds may provide little additional log output.
+- When it finishes, play the song and compare the sung words with the saved lyrics.
+  Check the ending too. **Needs review** is expected for this experimental backend.
+- Download the WAV/FLAC and song-details JSON. The run's `result/config.json` records
+  the actual engine, component files, and sampling options used.
+
+After a single song works, try a two-song batch. Each song should release its GPU
+process before the next starts. Start larger batches only after reviewing those
+outputs. A successful render confirms the engine works, not that it obeyed every
+lyric, style, or vocal instruction.
 
 The PyTorch model/VAE paths, device, memory budget, hash verification, offloading,
 quantization, revisions, cache settings and VAE tiles are **not used by audio.cpp**.
