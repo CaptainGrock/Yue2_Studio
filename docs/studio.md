@@ -227,3 +227,29 @@ Choose **Lyric profanity → Require strong profanity** to require at least thre
 ### Automatic shutdown
 
 After a browser connects, closing the last Studio tab automatically stops the local server after a 15-second grace period (connection loss detection may add a few seconds). Refreshing and additional tabs keep it alive. Active GPU jobs, queued jobs, batches and writing requests finish first. Browser presence uses an open connection instead of background-tab timers. Start Yue2 Studio.bat launches it again. Stop Yue2 Studio.bat remains the explicit immediate stop and cancels active work.
+
+
+## Export lyrics for a video builder
+
+**After an LLM draft:** use the buttons under Your draft to copy or download its
+currently reviewed lyrics. If you edited the draft, those edits are included.
+**After Surprise me or any music run:** open Song library → Open run. The run now
+shows **Lyrics & structure used for this run** and the same export controls.
+These use that run's saved input, so they work for old and failed runs too.
+The main song editor also has export buttons for your current edits.
+
+- **Copy lyrics:** plain text with original section tags and line breaks.
+- **Download lyrics TXT:** a UTF-8 text file you can paste/import into your builder.
+- **Song details JSON:** title, style, exact lyric text, source, optional run ID,
+  and ordered sections. Repeated choruses remain separate sections.
+
+The JSON schema is `yue2-studio-song-v1`. Each section has `index`, `tag`, `text`
+(including its tag line) and `lyrics` (the body). Untagged text has a null tag.
+Joining all section `text` values reproduces the exported `lyrics` exactly.
+The export contains no API key or runner connection settings. This is a generic
+handoff format; a video builder must support it or use the plain TXT instead.
+
+**Audio alignment:** these are the supplied words and writing cues, not verified
+words sung by the audio model. No word/section timestamps are invented. The JSON
+has `timing: null`. Use the finished audio with your video builder's transcription
+or alignment step if it needs exact scene timing, subtitles, or lip-sync.

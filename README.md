@@ -76,6 +76,7 @@ are needed. Paths are resolved locally; this repository includes no weights.
 - **Covers:** use your own ABC, or configure the separate SheetSage2 environment
   and models using the [upstream cover guide](https://github.com/multimodal-art-projection/YuE/blob/main/docs/covers.md).
   Review the transcribed melody before rendering. Covers do not clone a singer.
+- **Lyrics export:** copy section-tagged lyrics or download TXT and song-details JSON for your video workflow, from drafts, the editor, or saved runs.
 - **Progress and library:** watch stages, token speed, and synthesis steps; play or
   download completed songs and inspect saved settings and logs.
 
