@@ -84,6 +84,9 @@ def generation_spec(payload):
     stage = payload.get('stage','audio')
     if mode not in ('create','cover') or stage not in ('audio','plan'):
         raise ValueError('Unsupported workflow or stage.')
+    if settings['runtime']['backend']=='audio.cpp':
+        from .gguf import validate
+        validate(settings,stage)
     if stage=='plan' and req.cot=='off':
         raise ValueError('Direct audio has no symbolic plan. Choose Full or Melody.')
     if mode=='cover' and not req.abc:
@@ -277,6 +280,9 @@ class JobManager:
                             path = directory/'result'/name
                             if path.exists():
                                 receipt = json.loads(path.read_text(encoding='utf-8'))
+                                if receipt.get('warnings'):
+                                    job['status']='needs_review'
+                                    job['warning']='; '.join(receipt['warnings'])
                                 if any(receipt.get('truncated',{}).values()):
                                     job['status']='needs_review'
                                     job['warning']='A token limit was reached. Listen for an incomplete ending and inspect the score.'

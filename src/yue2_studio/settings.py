@@ -22,7 +22,7 @@ GROUPS = [
         field('vae_revision', 'Decoder revision', '', 'Optional independent Hub commit or tag for the VAE. This does not change the generation model revision.'),
         field('device', 'Compute device', 'auto', 'auto selects CUDA, then Apple MPS, then CPU. Enter cuda:0 or cuda:1 for a specific GPU. The supported baseline is a BF16-capable NVIDIA GPU with 24 GiB VRAM; CPU execution can be extremely slow.'),
         field('memory_budget_gib', 'GPU memory budget · GiB', 24.0, 'Total runtime memory budget. The CUDA pipeline reserves 2 GiB and caps allocation against physical VRAM. Smaller budgets can use smaller decode tiles; they do not shorten the song or reduce synthesis steps.', minimum=2.1, step=.5),
-        field('backend', 'Inference backend', 'torch', 'torch uses fast CUDA graphs. Builds without Flash Attention use cuDNN attention when supported, otherwise SDPA, while retaining graphs. torch-eager disables graphs for troubleshooting and is substantially slower. vllm needs separate fast dependencies and a supported platform.', choices=['torch','torch-eager','vllm']),
+        field('backend', 'Inference backend', 'torch', 'torch uses fast CUDA graphs. Builds without Flash Attention use cuDNN attention when supported, otherwise SDPA, while retaining graphs. torch-eager disables graphs for troubleshooting and is substantially slower. vllm needs separate fast dependencies and a supported platform. audio.cpp is experimental GGUF support; configure its separate settings group. PyTorch model paths, device, memory budget, quantization, offloading and VAE tiles do not apply to audio.cpp.', choices=['torch','torch-eager','vllm','audio.cpp']),
         field('quantization', 'Weight quantization', 'none', 'none preserves the baseline model precision. fp8 uses the optional runtime FP8 path to reduce weight memory; hardware/backend support and output quality require separate validation.', choices=['none','fp8']),
         field('offload_ar', 'Offload autoregressive model', False, 'Release/offload the autoregressive model before acoustic synthesis to reduce peak GPU memory. Reloading increases latency. This is not a lower-quality sampling preset.'),
         field('local_files_only', 'Offline model loading', True, 'Only use local files and already cached snapshots. Disable to allow Hugging Face downloads. LLM API calls are controlled separately by your chosen runner.'),
@@ -36,6 +36,25 @@ GROUPS = [
         field('cfg_scale', 'Semantic guidance (CFG)', None, 'Blank uses 1.0 for full/melody or 1.01 for direct audio. Values above 1 strengthen text conditioning and can increase compute. With ABC, both CFG branches retain the same score. Higher is not automatically better. No CFG is applied to the ABC planner.', kind='number', minimum=0, maximum=20, step=.01),
     ]),
 ]
+
+GROUPS.append(dict(id='gguf', title='audio.cpp / GGUF', subtitle='Experimental alternative engine. Requires a Yue2-capable audio.cpp dev build, GGUF components and all four sidecars. PyTorch runtime controls do not apply.', fields=[
+    field('executable','audio.cpp executable','','Full path to audiocpp_cli.exe on Windows or audiocpp_cli on Linux. Use a build with Yue2 support from the audio.cpp dev branch. Studio does not install or download the binary.'),
+    field('model_dir','GGUF model folder',str(ROOT/'models/Yue2-3B-GGUF'),'Folder containing the main GGUF, VAE GGUF and sidecars subfolder. Download only the component precision you want plus all sidecars.'),
+    field('model_gguf','Main GGUF','yue2-3b-q8_0.gguf','Q8 is the balanced default. Q4 uses smaller weights but is not necessarily faster or identical in quality. Paths are relative to the GGUF folder.',choices=['yue2-3b-q8_0.gguf','yue2-3b-q4_0.gguf','yue2-3b-bf16.gguf']),
+    field('vae_gguf','GGUF decoder','yue2-vae-f16.gguf','F16 reduces VAE weight memory. F32 uses more memory. The GGUF decoder is separate from the PyTorch VAE.',choices=['yue2-vae-f16.gguf','yue2-vae-f32.gguf']),
+    field('backend','audio.cpp device backend','cuda','Must be compiled into your audio.cpp binary. CUDA is the NVIDIA path; other backends depend on your build and are not locally validated.',choices=['cuda','cpu','vulkan','metal','hip']),
+    field('threads','audio.cpp CPU threads',8,'CPU threads for the C++ engine. More is not always faster when sharing the CPU with other programs.',kind='integer',minimum=1,maximum=256),
+]))
+for key,value,note in [
+    ('model_weight_context_mb',6144,'Main-model weight context capacity.'),
+    ('vae_weight_context_mb',1536,'VAE weight context capacity.'),
+    ('ar_prefill_graph_arena_mb',4096,'Graph arena for processing the prompt and score prefix.'),
+    ('ar_decode_graph_arena_mb',1536,'Graph arena for autoregressive token decoding.'),
+    ('nar_graph_arena_mb',6144,'Graph arena for acoustic synthesis.'),
+    ('vae_graph_arena_mb',1536,'Graph arena for waveform decoding.')]:
+    GROUPS[-1]['fields'].append(field(key,key.replace('_',' ').capitalize(),value,note+' Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures.',kind='integer',minimum=1))
+for key in ('model_weight_type','vae_weight_type'):
+    GROUPS[-1]['fields'].append(field(key,key.replace('_',' ').capitalize(),'native','Native retains storage from the selected GGUF. Overrides can alter memory, speed and quality; support depends on the audio.cpp build.',choices=['native','f32','f16','bf16','q8_0','q4_0','q4_k']))
 
 SAMPLING_NOTES = {
     'temperature': 'Scales token probabilities. Lower values are more predictable; higher values add variation. Zero selects greedily. This affects this stage only; it is separate from the LLM writing temperature.',

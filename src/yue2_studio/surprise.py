@@ -66,6 +66,9 @@ class SurpriseManager:
         if voice not in VOICES or cot not in ('full','melody','off'):
             raise ValueError('Choose a supported voice and generation mode.')
         settings=validate_settings(payload.get('settings',{}))
+        if settings['runtime']['backend']=='audio.cpp':
+            from .gguf import validate
+            validate(settings,'audio')
         connection=deepcopy(payload.get('connection',{}))
         llm.config(connection)  # Validate before accepting a batch or spending tokens.
         options={k:str(payload.get(k) or '').strip() for k in ('style','language','brief','instructions')}

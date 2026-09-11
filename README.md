@@ -8,6 +8,22 @@ no Gradio, Node build, or extra runtime Python dependencies beyond the installed
 
 *Write lyrics, shape a style, and generate music in one local workspace. See the [illustrated guide](docs/studio.md) for each part of the UI.*
 
+## See the Studio
+
+| Create a song | Create a cover |
+| --- | --- |
+| ![Song editor with style and lyrics](images/new-song.png) | ![Cover source upload and melody transcription](images/create-cover.png) |
+
+| LLM Runner | Advanced settings |
+| --- | --- |
+| ![Provider and model selection](images/llm-runner.png) | ![Searchable engine settings](images/advanced-settings.png) |
+
+| Writing room | Review your draft | Surprise me |
+| --- | --- | --- |
+| ![Describe a song idea](images/writing-room.png) | ![Edit and apply generated lyrics](images/review-draft.png) | ![Automatic song batches](images/surprise-me.png) |
+
+Click any screenshot to see it full size. The [illustrated guide](docs/studio.md) walks through each screen.
+
 ## 1. Install YuE2 first
 
 Follow the **[official YuE2 installation and quick start](https://github.com/multimodal-art-projection/YuE#quick-start)**.
@@ -82,6 +98,20 @@ are needed. Paths are resolved locally; this repository includes no weights.
   Review the transcribed melody before rendering. Covers do not clone a singer.
 - **Progress and library:** watch stages, token speed, and synthesis steps; play or
   download completed songs and inspect saved settings and logs.
+
+## Experimental GGUF / lower-VRAM engine
+
+Studio also has an **audio.cpp** backend for [audio-cpp/Yue2-3B-GGUF](https://huggingface.co/audio-cpp/Yue2-3B-GGUF).
+It requires a separate Yue2-capable audio.cpp executable, a main GGUF, a VAE GGUF,
+and four sidecars. Q8 + F16 VAE is the default GGUF combination; Q4 is selectable.
+Select **Advanced settings → Models & runtime → Inference backend → audio.cpp**, then
+configure the **audio.cpp / GGUF** group. `torch` stays the overall default.
+
+Original songs, supplied-ABC covers, Surprise me and audio downloads use the same UI.
+Plan-only output and generated ABC export currently require torch. GGUF outputs are
+marked for review because the CLI does not return structured truncation flags.
+This adapter is contract-tested with mocked CLI output; an actual GGUF render has
+not yet been validated here. See the [setup, limitations and memory guide](docs/gguf.md).
 
 ## Speed defaults
 

@@ -146,6 +146,10 @@ The format follows the [official Yue2 music skill](https://github.com/multimodal
 
 Edit the title, style and lyrics before applying. **Apply draft** uses the whole draft; **Use lyrics** and **Use style** transfer only the selected part. Review writing notes if provided.
 
+## Experimental audio.cpp / GGUF
+
+For the alternative lower-VRAM runtime, follow the [GGUF setup guide](gguf.md). Select audio.cpp in the inference backend control and configure its own model components. Normal songs, covers with supplied ABC, and Surprise me use the same workflows above. Torch-only runtime settings do not control the C++ process. Plan-only and generated ABC export remain torch features.
+
 ## Settings and storage
 
 ![Advanced settings with searchable groups and detailed model controls](../images/advanced-settings.png)

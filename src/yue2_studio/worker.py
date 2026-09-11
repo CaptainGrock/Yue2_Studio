@@ -10,6 +10,9 @@ from .compatibility import capabilities, compatible_runtime
 def run(path):
     spec = json.loads(Path(path).read_text(encoding='utf-8'))
     settings = spec['settings']
+    if settings['runtime']['backend']=='audio.cpp':
+        from .gguf import run
+        return run(path)
     from yue2 import YuE2Pipeline
     from yue2.protocol import GenerationConfig
     config = GenerationConfig.from_dict({k:settings[k] for k in ('abc','semantic')} |

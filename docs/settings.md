@@ -26,7 +26,7 @@ Where the music runs and how memory is used.
 | Decoder revision (`vae_revision`) | Automatic / blank | Optional independent Hub commit or tag for the VAE. This does not change the generation model revision.  |
 | Compute device (`device`) | auto | auto selects CUDA, then Apple MPS, then CPU. Enter cuda:0 or cuda:1 for a specific GPU. The supported baseline is a BF16-capable NVIDIA GPU with 24 GiB VRAM; CPU execution can be extremely slow.  |
 | GPU memory budget · GiB (`memory_budget_gib`) | 24.0 | Total runtime memory budget. The CUDA pipeline reserves 2 GiB and caps allocation against physical VRAM. Smaller budgets can use smaller decode tiles; they do not shorten the song or reduce synthesis steps. Minimum: 2.1. |
-| Inference backend (`backend`) | torch | torch uses fast CUDA graphs. Builds without Flash Attention use cuDNN attention when supported, otherwise SDPA, while retaining graphs. torch-eager disables graphs for troubleshooting and is substantially slower. vllm needs separate fast dependencies and a supported platform. Choices: torch, torch-eager, vllm. |
+| Inference backend (`backend`) | torch | torch uses fast CUDA graphs. Builds without Flash Attention use cuDNN attention when supported, otherwise SDPA, while retaining graphs. torch-eager disables graphs for troubleshooting and is substantially slower. vllm needs separate fast dependencies and a supported platform. Choices: torch, torch-eager, vllm, audio.cpp. audio.cpp uses its own settings below; PyTorch runtime settings do not apply. |
 | Weight quantization (`quantization`) | none | none preserves the baseline model precision. fp8 uses the optional runtime FP8 path to reduce weight memory; hardware/backend support and output quality require separate validation. Choices: none, fp8. |
 | Offload autoregressive model (`offload_ar`) | False | Release/offload the autoregressive model before acoustic synthesis to reduce peak GPU memory. Reloading increases latency. This is not a lower-quality sampling preset.  |
 | Offline model loading (`local_files_only`) | True | Only use local files and already cached snapshots. Disable to allow Hugging Face downloads. LLM API calls are controlled separately by your chosen runner.  |
@@ -34,6 +34,27 @@ Where the music runs and how memory is used.
 | Verify model hashes (`verify_hashes`) | False | Hash model files when opening the pipeline so each run records exact weight identity. Large files can take time to verify. Disabling trades provenance strength for faster startup.  |
 | VAE tile core frames (`vae_core_frames`) | Automatic / blank | Blank uses the engine default: 512 at budgets of 12 GiB or less, otherwise 1024. Larger tiles use more memory. Applies to tiled decoding; the engine may decode in one pass when memory permits. Minimum: 1. |
 | Detailed engine progress (`progress`) | True | Show live stage messages, token counts, and elapsed times in the run log. No artificial percentage is calculated: token limits are ceilings, not known completion targets.  |
+
+## audio.cpp / GGUF (experimental)
+
+See [GGUF installation and limitations](gguf.md) before selecting this backend.
+
+| Setting (`key`) | Default | Explanation |
+| --- | --- | --- |
+| audio.cpp executable (`executable`) | Blank | Full path to audiocpp_cli.exe on Windows or audiocpp_cli on Linux. Use a build with Yue2 support from the audio.cpp dev branch. Studio does not install or download the binary. |
+| GGUF model folder (`model_dir`) | <YuE2 root>\models\Yue2-3B-GGUF | Folder containing the main GGUF, VAE GGUF and sidecars subfolder. Download only the component precision you want plus all sidecars. |
+| Main GGUF (`model_gguf`) | yue2-3b-q8_0.gguf | Q8 is the balanced default. Q4 uses smaller weights but is not necessarily faster or identical in quality. Paths are relative to the GGUF folder. Choices: yue2-3b-q8_0.gguf, yue2-3b-q4_0.gguf, yue2-3b-bf16.gguf. |
+| GGUF decoder (`vae_gguf`) | yue2-vae-f16.gguf | F16 reduces VAE weight memory. F32 uses more memory. The GGUF decoder is separate from the PyTorch VAE. Choices: yue2-vae-f16.gguf, yue2-vae-f32.gguf. |
+| audio.cpp device backend (`backend`) | cuda | Must be compiled into your audio.cpp binary. CUDA is the NVIDIA path; other backends depend on your build and are not locally validated. Choices: cuda, cpu, vulkan, metal, hip. |
+| audio.cpp CPU threads (`threads`) | 8 | CPU threads for the C++ engine. More is not always faster when sharing the CPU with other programs. |
+| Model weight context mb (`model_weight_context_mb`) | 6144 | Main-model weight context capacity. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Vae weight context mb (`vae_weight_context_mb`) | 1536 | VAE weight context capacity. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Ar prefill graph arena mb (`ar_prefill_graph_arena_mb`) | 4096 | Graph arena for processing the prompt and score prefix. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Ar decode graph arena mb (`ar_decode_graph_arena_mb`) | 1536 | Graph arena for autoregressive token decoding. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Nar graph arena mb (`nar_graph_arena_mb`) | 6144 | Graph arena for acoustic synthesis. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Vae graph arena mb (`vae_graph_arena_mb`) | 1536 | Graph arena for waveform decoding. Units are MiB. These are upstream context/arena capacities, not a measured peak-VRAM estimate or a global memory budget. Smaller values can cause allocation failures. |
+| Model weight type (`model_weight_type`) | native | Native retains storage from the selected GGUF. Overrides can alter memory, speed and quality; support depends on the audio.cpp build. Choices: native, f32, f16, bf16, q8_0, q4_0, q4_k. |
+| Vae weight type (`vae_weight_type`) | native | Native retains storage from the selected GGUF. Overrides can alter memory, speed and quality; support depends on the audio.cpp build. Choices: native, f32, f16, bf16, q8_0, q4_0, q4_k. |
 
 ## Synthesis & guidance
 
