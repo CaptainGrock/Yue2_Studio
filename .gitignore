@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+models/
+runs/
+hf-cache/
+hf_modules/
+.studio-backups/
+.env
+*.log

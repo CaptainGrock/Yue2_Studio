@@ -1,0 +1,10 @@
+YuE2 Studio
+Custom local web interface and integration for YuE2.
+
+Includes modified code and helpers from multimodal-art-projection/YuE
+https://github.com/multimodal-art-projection/YuE
+Baseline: yue2-infer 0.1.6, commit 92a73cc7652fcc1f937855e4b765e0a0edd7ff2e.
+Changes: Windows Flash Attention availability check in cuda_graph.py;
+additional transcription options in transcribe.py; Studio application and launchers.
+See LICENSE and THIRD_PARTY_NOTICES.md. Model weights are not distributed here;
+their separate license is retained in MODEL_LICENSE.
