@@ -84,6 +84,16 @@ are needed. Paths are resolved locally; this repository includes no weights.
 - **Progress and library:** watch stages, token speed, and synthesis steps; play or
   download completed songs and inspect saved settings and logs.
 
+## Choose your music engine
+
+Switch **Torch / GGUF** using **Music engine** above the song editor. Open
+**Set up GGUF / Models** (also in the sidebar as **Music models**) to download Q4,
+Q8, or BF16 bundles with their decoder and supporting files. The panel shows
+sizes, progress, cancellation, verification, and automatic engine detection.
+Click **Use model**, then create songs with your own lyrics/style or Surprise me.
+Engine installation instructions are included; audio.cpp itself is installed
+separately. [Setup and download guide](docs/gguf.md#easy-setup-from-the-main-page).
+
 ## Experimental GGUF / lower-VRAM engine
 
 Studio also has an **audio.cpp** backend for [audio-cpp/Yue2-3B-GGUF](https://huggingface.co/audio-cpp/Yue2-3B-GGUF).

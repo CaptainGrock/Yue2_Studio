@@ -23,6 +23,7 @@ from .settings import ROOT, GROUPS, FIXED, defaults, validate_settings
 from .surprise import SurpriseManager
 from .compatibility import capabilities
 from .lifetime import BrowserLifetime
+from .model_manager import ModelManager
 
 STATIC = Path(__file__).parent/'static'
 
@@ -49,10 +50,11 @@ class StudioServer(ThreadingHTTPServer):
         super().__init__(address,Handler)
         self.jobs = manager or JobManager(root)
         self.surprises = SurpriseManager(self.jobs,self.llm_lock)
+        self.models = ModelManager()
 
 
     def service_actions(self):
-        busy = (self.llm_lock.locked() or
+        busy = (self.models.busy() or self.llm_lock.locked() or
                 any(j['status'] in ('queued','running','cancelling') for j in self.jobs.list()) or
                 any(b['status'] in ('queued','writing','rendering','cancelling') for b in self.surprises.list()))
         if not self.auto_stopping and self.browser_lifetime.should_stop(busy):
@@ -62,6 +64,8 @@ class StudioServer(ThreadingHTTPServer):
 
     def server_close(self):
         self.browser_stop.set()
+        if hasattr(self,'models'):
+            self.models.cancel()
         super().server_close()
 
 
@@ -120,6 +124,8 @@ class Handler(BaseHTTPRequestHandler):
                     'providers':llm.catalogue(),'songwriter_prompt':llm.PROMPT,'compatibility':capabilities(),'profanity_check':True,'browser_autoclose':True,
                     'paths':{'root':str(ROOT),'runs':str(self.server.jobs.root)},
                     'installed':{name:(ROOT/'models'/name).is_dir() for name in ('YuE2-3B','YuE2-Vae','SheetSage2','MERT-v2-FullSong')}})
+            elif path=='/api/models':
+                self.json(self.server.models.status())
             elif path=='/api/jobs':
                 self.json({'jobs':self.server.jobs.list()})
             elif path=='/api/surprises':
@@ -141,7 +147,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
-            elif path in ('/','/index.html','/app.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/models.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)
@@ -182,12 +188,31 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/shutdown':
                 self.json({'status':'stopping'})
                 threading.Thread(target=self.server.shutdown,daemon=True).start()
+            elif path=='/api/models/check':
+                from .gguf import validate
+                settings = validate_settings(data)
+                try:
+                    validate(settings,'audio')
+                    self.json({'ready':True,'error':''})
+                except ValueError as exc:
+                    self.json({'ready':False,'error':str(exc)})
+            elif path=='/api/models/download':
+                with self.server.models.lock:
+                    if any(j['status'] in ('queued','running','cancelling') for j in self.server.jobs.list()) or any(b['status'] in ('queued','writing','rendering','cancelling') for b in self.server.surprises.list()):
+                        raise ValueError('Finish active songs and batches before downloading model files.')
+                    self.json(self.server.models.start(data.get('variant')),202)
+            elif path=='/api/models/cancel':
+                self.json(self.server.models.cancel())
             elif path=='/api/surprises':
-                self.json(self.server.surprises.start(data),202)
+                with self.server.models.lock:
+                    if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
+                    self.json(self.server.surprises.start(data),202)
             elif re.fullmatch(r'/api/surprises/[a-f0-9]{32}/cancel',path):
                 self.json(self.server.surprises.cancel(path.split('/')[3]))
             elif path=='/api/generate':
-                self.json(self.server.jobs.generate(data),202)
+                with self.server.models.lock:
+                    if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
+                    self.json(self.server.jobs.generate(data),202)
             elif path=='/api/transcribe':
                 self.json(self.server.jobs.transcribe(data),202)
             elif path=='/api/score':
@@ -202,7 +227,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Only failed, cancelled or interrupted music runs can be retried.')
                 spec=original['input']
                 spec['source_job']=original['id']
-                self.json(self.server.jobs.generate(spec),202)
+                with self.server.models.lock:
+                    if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
+                    self.json(self.server.jobs.generate(spec),202)
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/wav',path):
                 directory = self.server.jobs.directory(path.split('/')[3])
                 source = directory/'result/audio.flac'

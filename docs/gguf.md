@@ -27,6 +27,41 @@ The model card describes this dev branch as community testing/validation work.
 Studio still requires the original YuE2 environment for its shared protocol,
 score tools and audio conversion. This is not yet a standalone C++-only installer.
 
+## Easy setup from the main page
+
+Use **Music engine** above the song editor to switch between Torch and GGUF.
+The adjacent status shows the selected model and whether its files are ready.
+Switching preserves lyrics, style, score, and sampling settings, and also applies
+for future Surprise me songs. Already queued jobs keep their submitted settings.
+
+Open **Set up GGUF / Models**, or **Music models** in the sidebar:
+
+1. Check the engine section. Standard audio.cpp build folders are detected, or
+   paste an existing executable path and click **Apply engine path**. If missing,
+   expand the installation instructions. The UI downloads weights; it does not
+   build audio.cpp or install drivers/compiler tools for you.
+2. Choose **Download Q4**, **Download Q8**, or **Download BF16**. Every bundle
+   includes the F16 VAE and all four sidecars. Sizes and missing bytes are shown.
+   Q8 is the balanced choice; Q4 is suggested below 12 GiB detected NVIDIA VRAM.
+   That heuristic is not a guarantee that a song fits. Q4/BF16 remain untested
+   locally for generation.
+3. Watch download and verification progress. Cancel keeps completed files; retry
+   restarts the unfinished file. Network errors and disk-space failures appear
+   in the panel. Downloads keep Studio alive after the last tab closes.
+4. Click **Use Q4/Q8/BF16** after download completes. This selects GGUF and fills
+   in component paths. Then close the panel and create your song normally.
+
+Downloads go to `models/Yue2-3B-GGUF` under the user's YuE2 installation. The
+catalog pins a Hugging Face revision; files are size- and checksum-verified before
+atomic publication. **Verify files** checks an existing bundle and downloads any
+missing or invalid component. No API key is needed. A files-ready label checks
+presence, not hardware compatibility or music quality. Do not move or replace
+model files while generation is running. Studio blocks download starts during
+active songs/batches and blocks new song submissions during a transfer.
+
+Custom model folders and the F32 decoder remain available in Advanced settings.
+The guided downloader provides the F16 decoder. The detailed/manual setup follows.
+
 ## 1. Obtain audio.cpp with Yue2 support
 
 Use the [audio.cpp dev branch](https://github.com/0xShug0/audio.cpp/tree/dev).
