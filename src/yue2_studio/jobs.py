@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -214,6 +215,16 @@ class JobManager:
                         raise
             self._persist(job)
             return deepcopy(job)
+
+    def delete(self,job_id):
+        with self.lock:
+            directory = self.directory(job_id)
+            job = self.jobs[job_id]
+            if job['status'] in ('queued','running','cancelling'):
+                raise ValueError('Cancel this run before removing it.')
+            del self.jobs[job_id]
+            shutil.rmtree(directory)
+            return {'deleted':job_id,'title':job.get('title')}
 
     def _command(self,job_id,spec):
         directory = self.directory(job_id)
