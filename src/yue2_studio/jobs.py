@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -114,6 +115,12 @@ class JobManager:
         for path in self.root.glob('*/job.json'):
             try:
                 job = json.loads(path.read_text(encoding='utf-8'))
+                if job.get('kind')=='generation' and 'backend' not in job:
+                    try:
+                        input_data = json.loads((path.parent/'input.json').read_text(encoding='utf-8'))
+                        job['backend'] = input_data.get('settings',{}).get('runtime',{}).get('backend','torch')
+                    except (OSError,ValueError,AttributeError):
+                        job['backend'] = 'torch'
                 if job['status'] in ('queued','running','cancelling'):
                     job.update(status='interrupted',error='Studio stopped before this job finished. Start a fresh run.',finished=now())
                     write_json(path,job)
@@ -141,6 +148,8 @@ class JobManager:
             directory.mkdir(exist_ok=False)
             write_json(directory/'input.json',spec)
             job = dict(id=job_id,kind=kind,title=spec['title'],status='queued',created=now(),stage=spec.get('stage','transcribe'),mode=spec.get('mode','cover'))
+            if kind=='generation':
+                job['backend'] = spec['settings']['runtime']['backend']
             self.jobs[job_id] = job
             self._persist(job)
             self.queue.put(job_id)
@@ -214,6 +223,16 @@ class JobManager:
                         raise
             self._persist(job)
             return deepcopy(job)
+
+    def delete(self,job_id):
+        with self.lock:
+            directory = self.directory(job_id)
+            job = self.jobs[job_id]
+            if job['status'] in ('queued','running','cancelling'):
+                raise ValueError('Cancel this run before removing it.')
+            shutil.rmtree(directory)
+            del self.jobs[job_id]
+            return {'deleted':job_id,'title':job.get('title')}
 
     def _command(self,job_id,spec):
         directory = self.directory(job_id)

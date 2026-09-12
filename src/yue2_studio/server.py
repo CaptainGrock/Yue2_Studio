@@ -221,6 +221,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.json({'settings':validate_settings(data)})
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/cancel',path):
                 self.json(self.server.jobs.cancel(path.split('/')[3]))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/delete',path):
+                self.json(self.server.jobs.delete(path.split('/')[3]))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/retry',path):
                 original=self.server.jobs.detail(path.split('/')[3])
                 if original['kind']!='generation' or original['status'] not in ('failed','cancelled','interrupted'):
