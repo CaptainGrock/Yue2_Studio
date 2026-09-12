@@ -223,6 +223,29 @@ class QueueTests(unittest.TestCase):
             reopened=JobManager(tmp,start=False)
             self.assertEqual(reopened.jobs[job['id']]['status'],'interrupted')
 
+    def test_library_backend_metadata_and_safe_delete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager=JobManager(tmp,start=False);job=manager.generate(payload());job_id=job['id']
+            self.assertEqual(job['backend'],'torch')
+            manager.jobs[job_id]['status']='cancelled';manager._persist(manager.jobs[job_id])
+            with patch('yue2_studio.jobs.shutil.rmtree',side_effect=OSError('busy')):
+                with self.assertRaises(OSError):manager.delete(job_id)
+            self.assertIn(job_id,manager.jobs)
+            result=manager.delete(job_id)
+            self.assertEqual(result['deleted'],job_id)
+            self.assertNotIn(job_id,manager.jobs)
+            self.assertFalse((Path(tmp)/job_id).exists())
+
+    def test_old_generation_loads_backend_from_saved_input(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager=JobManager(tmp,start=False);job=manager.generate(payload());job_id=job['id']
+            job_path=manager.directory(job_id)/'job.json'
+            saved=json.loads(job_path.read_text());saved.pop('backend');job_path.write_text(json.dumps(saved))
+            input_path=manager.directory(job_id)/'input.json'
+            saved_input=json.loads(input_path.read_text());saved_input['settings']['runtime']['backend']='audio.cpp';input_path.write_text(json.dumps(saved_input))
+            reopened=JobManager(tmp,start=False)
+            self.assertEqual(reopened.jobs[job_id]['backend'],'audio.cpp')
+
     def test_worker_command_uses_argument_array_and_separate_python(self):
         with tempfile.TemporaryDirectory() as tmp:
             manager=JobManager(tmp,start=False)
