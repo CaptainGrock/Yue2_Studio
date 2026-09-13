@@ -29,9 +29,9 @@ function applyTheme(theme,persist=true){
   if(persist)try{localStorage.setItem(THEME_KEY,JSON.stringify(currentTheme));}catch{}
   syncThemeDialog();
 }
-function syncThemeDialog(){if(!$('appearanceDialog'))return;document.querySelectorAll('[data-theme]').forEach(card=>{const selected=card.dataset.theme===currentTheme.name;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));});}
+function syncThemeDialog(){if(!$('appearanceDialog'))return;document.querySelectorAll('#appearanceDialog .theme-card[data-theme]').forEach(card=>{const selected=card.dataset.theme===currentTheme.name;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));});}
 function loadTheme(){try{const saved=JSON.parse(localStorage.getItem(THEME_KEY));const name=THEMES[saved?.name]?saved.name:'midnight';applyTheme({name,...THEMES[name]},false);}catch{applyTheme({name:'midnight',...THEMES.midnight},false);}}
-function bindAppearance(){$('appearanceNav').onclick=()=>{syncThemeDialog();$('appearanceDialog').showModal();};document.querySelectorAll('[data-theme]').forEach(card=>card.onclick=()=>{const name=card.dataset.theme;applyTheme({name,...THEMES[name]});toast(`${card.querySelector('strong').textContent} theme applied.`);});$('resetTheme').onclick=()=>applyTheme({name:'midnight',...THEMES.midnight});$('doneAppearance').onclick=()=>$('appearanceDialog').close();}
+function bindAppearance(){$('appearanceNav').onclick=()=>{syncThemeDialog();$('appearanceDialog').showModal();};document.querySelectorAll('#appearanceDialog .theme-card[data-theme]').forEach(card=>card.onclick=()=>{const name=card.dataset.theme;applyTheme({name,...THEMES[name]});toast(`${card.querySelector('strong').textContent} theme applied.`);});$('resetTheme').onclick=()=>applyTheme({name:'midnight',...THEMES.midnight});$('doneAppearance').onclick=()=>$('appearanceDialog').close();}
 loadTheme();
 function button(text,fn,style='subtle small'){const b=document.createElement('button');b.className='button '+style;b.textContent=text;b.onclick=fn;return b;}
 function message(id,text,error=false){const box=$(id);box.hidden=!text;box.className='feedback'+(error?' error':'');box.textContent=text;}
