@@ -62,6 +62,14 @@ The screenshot shows Custom because the memory controls were adjusted manually.
 5. Use **Plan only** to inspect an ABC composition first, or **Create song** to render everything.
 6. Open the run from the library. Listen, download FLAC/WAV, and inspect its actual logs and artifacts.
 
+In the library, click the star beside a title to save a favorite, then choose
+**Starred only** to find it again. Stars are stored with the run and survive a
+Studio restart; starring a run does not change its generation settings or interrupt it.
+Combine search and the existing run filters with **Created today**, **Created yesterday**,
+**Last 7 days**, **Last 30 days**, or **Choose a date…**. Dates use your browser's
+local calendar and the run's creation time, not its completion time. The last-7/30-day
+presets include today. **Any date** removes the date restriction.
+
 An empty lyrics field is allowed for instrumental requests; describe the instrumental intent in Style.
 There is no supported exact-duration setting. Sampling maxima cap tokens, and the UI flags truncation
 instead of calling a capped result a complete musical performance. All default sampling values and
