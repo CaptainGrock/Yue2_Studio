@@ -46,7 +46,7 @@ async function refreshLoras(){
 }
 function bindLoras(){
   $('refreshLoras').onclick=()=>busy('refreshLoras',refreshLoras);
-  for(const id of ['loraSelect','surpriseLoraSelect'])if($(id))$(id).onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$(id).value;loraListError='';syncLoras();save();if(state.settings.lora.path)inspectSelectedLora(state.settings.lora.path);};
+  for(const id of ['loraSelect','surpriseLoraSelect'])if($(id))$(id).onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$(id).value;if(state.settings.lora.path&&$('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();if(state.settings.lora.path)inspectSelectedLora(state.settings.lora.path);};
   if($('refreshSurpriseLoras'))$('refreshSurpriseLoras').onclick=()=>busy('refreshSurpriseLoras',refreshLoras);
   $('loraStrength').oninput=()=>{state.settings.lora.strength=Number($('loraStrength').value);syncLoras();save();};
   $('loraAutoTrigger').onchange=()=>{state.settings.lora.auto_trigger=$('loraAutoTrigger').checked;syncLoras();save();};
@@ -54,7 +54,7 @@ function bindLoras(){
     const path=$('loraLocalPath').value.trim().replace(/^"(.*)"$/,'$1');
     const info=await api('/api/loras/inspect',{path});
     localLoras.set(info.path,{...info,name:loraName(info.path)});
-    state.settings.lora.path=info.path;loraListError='';syncLoras();save();toast('LoRA selected for future songs.');
+    state.settings.lora.path=info.path;if($('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();toast('LoRA selected for future songs.');
   });
   refreshLoras();
 }

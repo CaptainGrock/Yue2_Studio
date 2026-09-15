@@ -121,7 +121,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.browser_session()
             elif path=='/api/bootstrap':
                 self.json({'token':self.server.token,'groups':GROUPS,'fixed':FIXED,'defaults':defaults(),
-                    'providers':llm.catalogue(),'songwriter_prompt':llm.PROMPT,'compatibility':capabilities(),'profanity_check':True,'browser_autoclose':True,
+                    'providers':llm.catalogue(),'songwriter_prompt':llm.PROMPT,'compatibility':capabilities(),'profanity_check':True,'surprise_style_lock':True,'browser_autoclose':True,
                     'paths':{'root':str(ROOT),'runs':str(self.server.jobs.root)},
                     'installed':{name:(ROOT/'models'/name).is_dir() for name in ('YuE2-3B','YuE2-Vae','SheetSage2','MERT-v2-FullSong')}})
             elif path=='/api/models':

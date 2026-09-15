@@ -2,7 +2,7 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 const elements=new Map(),sent=[];
 function element(id){if(!elements.has(id))elements.set(id,{value:'',textContent:'',options:[],addEventListener(){},replaceChildren(...items){this.options=items;},add(item){this.options.push(item);}});return elements.get(id);}
-const state={boot:{},connection:{model:'test'},settings:{runtime:{backend:'torch'},lora:{path:'',strength:1,auto_trigger:true}}};
+const state={boot:{surprise_style_lock:true},connection:{model:'test'},settings:{runtime:{backend:'torch'},lora:{path:'',strength:1,auto_trigger:true}}};
 const context=vm.createContext({state,$:element,Option:function(text,value){this.text=text;this.value=value;},save(){},toast(){},busy:async(id,fn)=>fn(),pollSurprises:async()=>{},openRunner(){throw Error('unexpected');},api:async(url,data)=>{
  if(url==='/api/loras')return {folder:'local',loras:[{path:'local/test.safetensors',name:'Test'}],rejected:[]};
  if(url==='/api/loras/inspect')return {path:data.path,trigger_word:'test_sound'};
@@ -21,13 +21,20 @@ vm.runInContext(app.slice(app.indexOf('function bindSurprise()'),app.indexOf('as
  element('loraStrength').value='0.75';element('loraStrength').oninput();
  assert.match(element('surpriseLoraStatus').textContent,/0.75/);
  element('surpriseCount').value='2';
+ assert.equal(element('surpriseLockStyle').checked,true);
+ await assert.rejects(element('surpriseButton').onclick(),/Enter a style/);
+ element('surpriseStyle').value='Exact rock style';
  await element('surpriseButton').onclick();
+ assert.equal(sent[0].lock_style,true);
+ assert.equal(sent[0].style,'Exact rock style');
+ element('surpriseLockStyle').checked=false;
  assert.equal(sent[0].settings.lora.path,'local/test.safetensors');
  assert.equal(sent[0].settings.lora.strength,.75);
  assert.equal(sent[0].settings.lora.auto_trigger,true);
  element('surpriseLoraSelect').value='';element('surpriseLoraSelect').onchange();
  await element('surpriseButton').onclick();
  assert.equal(sent[1].settings.lora.path,'');
+ assert.equal(sent[1].lock_style,false);
  assert.equal(sent[0].settings.lora.path,'local/test.safetensors','previous submission unchanged');
  element('loraSelect').value='local/test.safetensors';element('loraSelect').onchange();
  assert.equal(element('surpriseLoraSelect').value,'local/test.safetensors');

@@ -18,6 +18,33 @@ def options(**values):
 
 
 class SurpriseTests(unittest.TestCase):
+    def test_locked_style_is_exact_and_unlocked_style_can_vary(self):
+        for locked in (True,False):
+            with self.subTest(locked=locked), tempfile.TemporaryDirectory() as tmp:
+                jobs=JobManager(tmp,start=False);manager=SurpriseManager(jobs,threading.Lock())
+                exact='  Crunchy guitars, intimate mezzo\n[Harmony]  '
+                calls=[]
+                def generate(payload):
+                    calls.append(payload)
+                    job=jobs._add('generation',payload)
+                    jobs.jobs[job['id']]['status']='complete'
+                    return job
+                result={'draft':{'title':'New song','lyrics':'[Verse]\nNew words','style':'LLM changed this to disco'}}
+                with patch('yue2_studio.surprise.llm.assist',return_value=result) as assist,patch.object(jobs,'generate',side_effect=generate):
+                    batch=manager.start(options(count=1,style=exact,lock_style=locked))
+                    manager.threads[batch['id']].join(5)
+                self.assertEqual(manager.list()[0]['status'],'complete')
+                self.assertEqual(calls[0]['request']['style'],exact if locked else 'Female lead vocal. LLM changed this to disco')
+                self.assertEqual(manager.list()[0]['lock_style'],locked)
+                if locked:self.assertIn('STYLE IS LOCKED',assist.call_args.args[0]['brief'])
+
+    def test_lock_requires_nonempty_style_and_boolean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager=SurpriseManager(JobManager(tmp,start=False),threading.Lock())
+            for values in ({'lock_style':True,'style':' '},{'lock_style':'yes'}):
+                with self.assertRaises(ValueError):manager.start(options(**values))
+            self.assertEqual(manager.list(),[])
+
     def test_five_distinct_songs_sequential_with_constraints_and_no_keys(self):
         with tempfile.TemporaryDirectory() as tmp:
             jobs=JobManager(tmp,start=False);manager=SurpriseManager(jobs,threading.Lock())

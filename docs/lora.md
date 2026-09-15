@@ -59,6 +59,16 @@ protection. GPU/audio quality testing with a trained adapter remains a separate
 validation step.
 # Surprise me
 
+**Keep this style unchanged** defaults on when selecting a LoRA. Supply your
+training style in Style direction: the renderer uses that text instead of the
+LLM's generated style, while new titles and lyrics are still written. Automatic
+trigger insertion may add the adapter's trigger phrase. Locked style takes
+precedence over vocal-gender wording; Instrumental still removes sung lyrics.
+An empty locked style is rejected. Uncheck to experiment with varied styles.
+The choice is saved in projects/drafts and frozen per batch. Updating an already
+running Studio requires a restart after its jobs finish to enable this backend
+feature; the UI blocks locked batches on an older running backend.
+
 The Surprise me panel has a LoRA dropdown and Refresh list action. It shares the
 creation-area selection, strength, and automatic-trigger setting; every song in
 a new batch uses that saved selection. Choose None for the original model.

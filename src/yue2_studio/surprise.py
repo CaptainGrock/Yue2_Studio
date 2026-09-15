@@ -51,8 +51,13 @@ class SurpriseManager:
             return deepcopy(sorted(self.records.values(),key=lambda r:r['created'],reverse=True))
 
     def start(self, payload):
-        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity'}:
+        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity','lock_style'}:
             raise ValueError('Unknown Surprise me options.')
+        lock_style=payload.get('lock_style',False)
+        if type(lock_style) is not bool:
+            raise ValueError('Keep style unchanged must be true or false.')
+        if lock_style and (not isinstance(payload.get('style'),str) or not payload['style'].strip()):
+            raise ValueError('Enter a style direction before locking it.')
         count=payload.get('count',1)
         voice=payload.get('voice','any')
         cot=payload.get('cot','full')
@@ -72,6 +77,7 @@ class SurpriseManager:
         connection=deepcopy(payload.get('connection',{}))
         llm.config(connection)  # Validate before accepting a batch or spending tokens.
         options={k:str(payload.get(k) or '').strip() for k in ('style','language','brief','instructions')}
+        if lock_style:options['style']=payload['style']  # Preserve exact supplied text.
         if any(len(v)>12000 for v in options.values()):
             raise ValueError('Shorten your surprise directions to 12,000 characters per field.')
         with self.lock:
@@ -80,7 +86,7 @@ class SurpriseManager:
             if any(r['status'] in ACTIVE for r in self.records.values()):
                 raise ValueError('A surprise batch is already active. Finish or stop it before starting another.')
             record=dict(id=uuid.uuid4().hex,created=now(),status='queued',count=count,voice=voice,profanity=profanity,
-                        cot=cot,options=options,settings=settings,provider=connection['provider'],
+                        cot=cot,lock_style=lock_style,options=options,settings=settings,provider=connection['provider'],
                         model=connection['model'],songs=[],current=0)
             self.records[record['id']]=record
             event=threading.Event()
@@ -136,6 +142,8 @@ class SurpriseManager:
                        'Make this song distinct from the earlier songs below: new title, story, imagery and hook. '
                        'Honor the chosen voice and style; do not add contradictory vocal directions. '
                        f'Earlier songs: {json.dumps(previous,ensure_ascii=False)}')
+                if record.get('lock_style'):
+                    brief += ' STYLE IS LOCKED: invent only the title and lyrics to fit the supplied style. Do not redesign the genre, arrangement, or vocal character. The supplied style takes precedence over conflicting vocal directions; any style you return will be ignored.'
                 if record.get('profanity')=='required':
                     brief += ' '+PROFANITY_DIRECTION
                 acquired=False
@@ -152,7 +160,7 @@ class SurpriseManager:
                 draft=result.get('draft')
                 if result.get('truncated') or not draft:
                     raise ValueError('The LLM returned an incomplete draft. Increase its output-token limit or change model, then start a new batch.')
-                if not draft['title'].strip() or not draft['style'].strip():
+                if not draft['title'].strip() or (not record.get('lock_style') and not draft['style'].strip()):
                     raise ValueError('The LLM returned an empty title or style; this batch was stopped.')
                 if record['voice']!='instrumental' and (not draft['lyrics'].strip() or '[' not in draft['lyrics']):
                     raise ValueError('The LLM returned empty or unsectioned lyrics; this batch was stopped.')
@@ -161,8 +169,8 @@ class SurpriseManager:
                 if any(draft['title'].strip().casefold()==p['title'].casefold() or
                        (record['voice']!='instrumental' and draft['lyrics'].strip()==p['lyrics']) for p in previous):
                     raise ValueError('The LLM repeated an earlier song. This batch was stopped to avoid rendering duplicates.')
-                style=draft['style']
-                if record['voice']!='any':style=VOICES[record['voice']]+' '+style
+                style=options['style'] if record.get('lock_style') else draft['style']
+                if not record.get('lock_style') and record['voice']!='any':style=VOICES[record['voice']]+' '+style
                 lyrics='' if record['voice']=='instrumental' else draft['lyrics']
                 spec={'title':draft['title'],'mode':'create','stage':'audio',
                       'source_job':f'surprise:{batch_id}:{index+1}', 'settings':record['settings'],
