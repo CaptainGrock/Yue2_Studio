@@ -1,7 +1,27 @@
 """Local acoustic adapter discovery and immutable queued identity."""
 from pathlib import Path
+import json
+import re
 
 from .settings import ROOT
+
+
+def training_style(metadata):
+    style=metadata.get('training_style','')
+    if isinstance(style,str) and style.strip() and len(style)<=12000:
+        return style
+    # Legacy Style adapters reference an immutable, versioned local setup.
+    # Never rewrite adapter bytes (queued jobs rely on their hash).
+    project_id=metadata.get('project_id','')
+    if metadata.get('format')=='yue2-lora-v1' and isinstance(project_id,str) and re.fullmatch(r'[a-f0-9]{32}',project_id):
+        try:
+            project=json.loads((ROOT/'training/projects'/f'{project_id}.json').read_text(encoding='utf-8'))
+            style=project.get('default_caption','')
+            if project.get('id')==project_id and isinstance(style,str) and style.strip() and len(style)<=12000:
+                return style
+        except (OSError,ValueError,AttributeError):
+            pass
+    return ''
 
 
 def inspect_adapter(path):
@@ -13,7 +33,7 @@ def inspect_adapter(path):
         adapter = AcousticLoRA.read(path)
     except SafetensorError as exc:
         raise ValueError('Invalid safetensors adapter: '+str(exc)) from exc
-    return adapter.info(1.0)
+    return {**adapter.info(1.0), 'training_style':training_style(adapter.metadata)}
 
 
 def catalogue():
@@ -45,7 +65,7 @@ def catalogue():
                 if used != keys:
                     raise ValueError('Unsupported adapter tensors')
             items.append({'path':str(path.resolve()), 'name':path.stem,
-                          'trigger_word':metadata.get('trigger_word','')})
+                          'trigger_word':metadata.get('trigger_word',''),'training_style':training_style(metadata)})
         except (OSError, ValueError, RuntimeError, SafetensorError) as exc:
             rejected.append({'name':path.name, 'error':str(exc)})
     return {'folder':str(folder), 'loras':items, 'rejected':rejected}

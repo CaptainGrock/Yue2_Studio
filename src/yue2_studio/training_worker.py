@@ -244,7 +244,7 @@ def run(spec, directory):
     parameters = [p for adapter in adapters.values() for p in (adapter.down,adapter.up)]
     optimizer = torch.optim.AdamW(parameters,lr=controls['learning_rate'],weight_decay=0.01)
     seq = sequence(prefix,frames,device)
-    metadata = {'trigger_word':project['trigger'],'base_model':spec['model'],
+    metadata = {'trigger_word':project['trigger'],'training_style':project['default_caption'],'base_model':spec['model'],
                 'base_sha256':hashlib.sha256(json.dumps(base_identity,sort_keys=True).encode()).hexdigest(),
                 'project_id':project['id'],'alpha':str(controls['rank']), 'rank':str(controls['rank']),
                 'conditioning':'text-only-cot-off','targets':'nar-attention','seed':'42'}

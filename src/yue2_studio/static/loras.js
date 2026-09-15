@@ -20,6 +20,7 @@ function syncLoras(){
   $('loraStrength').value=selection.strength;$('loraStrengthValue').textContent=Number(selection.strength).toFixed(2);
   $('loraAutoTrigger').checked=selection.auto_trigger;
   const item=items.get(current);
+  if($('surpriseTrainingStyleStatus'))$('surpriseTrainingStyleStatus').textContent=current?(item?.training_style?.trim()?'Training style saved in this LoRA. Selecting it fills both song-creation style boxes; you can edit either.':'No training style saved / not yet inspected. Your style descriptions are unchanged.'):'Selecting a LoRA can fill both song-creation style boxes from its saved training style.';
   if($('loraStrengthHelp'))$('loraStrengthHelp').textContent='0 applies no effect. Lower strengths give a subtler influence; 1 is the starting point. Above 1 can introduce distortion or reduce coherence. Style adapters affect acoustic rendering, not the composer.';
   $('loraTrigger').textContent=item?.trigger_word||'No phrase recorded / not yet inspected';
   const gguf=state.settings.runtime.backend==='audio.cpp';
@@ -29,12 +30,31 @@ function syncLoras(){
   if($('surpriseLoraStatus'))$('surpriseLoraStatus').textContent=(current?'Strength '+Number(selection.strength).toFixed(2)+' · Automatic trigger '+(selection.auto_trigger?'on':'off')+'. ':'')+$('loraStatus').textContent;
   $('loraFolder').textContent=loraFolder?'Place YuE2 .safetensors files in '+loraFolder+' and refresh the list.':'Default folder: models/loras inside your YuE2 installation.';
 }
-async function inspectSelectedLora(path){
+function loraStyleSnapshot(){return Object.fromEntries(['style','surpriseStyle'].map(id=>[id,$(id)?.value]));}
+function offerLoraTrainingStyle(info,previousStyles){
+  const style=info.training_style;
+  if(typeof style!=='string'||!style.trim()||style.length>12000)return;
+  const candidates=Object.keys(previousStyles).filter(id=>$(id)&&$(id).value===previousStyles[id]&&$(id).value!==style);
+  const apply=ids=>{
+    if(state.settings.lora.path!==info.path)return;
+    for(const id of ids)if($(id).value===previousStyles[id]){
+      $(id).value=style;
+      if(id==='surpriseStyle')$('surpriseLockStyle').checked=true;
+    }
+    if(typeof updateCounts==='function')updateCounts();
+    save();
+  };
+  apply(candidates.filter(id=>!$(id).value.trim()));
+  const conflicts=candidates.filter(id=>previousStyles[id].trim());
+  if(conflicts.length)confirmReplace('Use this LoRA’s training style?','Replace existing text in '+conflicts.map(id=>id==='style'?'Style':'Surprise me Style direction').join(' and ')+' with the style saved in this LoRA? You can edit it afterward.',()=>apply(conflicts));
+}
+async function inspectSelectedLora(path,fillStyle=false){
+  const previousStyle=loraStyleSnapshot();
   const epoch=++loraInspectEpoch;
   try{
     const info=await api('/api/loras/inspect',{path});
     localLoras.set(info.path,{...info,name:loraCatalogue.find(item=>item.path===info.path)?.name||loraName(info.path)});
-    if(epoch===loraInspectEpoch&&state.settings.lora.path===path){state.settings.lora.path=info.path;loraListError='';syncLoras();save();}
+    if(epoch===loraInspectEpoch&&state.settings.lora.path===path){state.settings.lora.path=info.path;loraListError='';syncLoras();save();if(fillStyle)offerLoraTrainingStyle(info,previousStyle);}
   }catch(error){if(epoch===loraInspectEpoch&&state.settings.lora.path===path){loraListError=error.message;syncLoras();}}
 }
 async function refreshLoras(){
@@ -46,15 +66,16 @@ async function refreshLoras(){
 }
 function bindLoras(){
   $('refreshLoras').onclick=()=>busy('refreshLoras',refreshLoras);
-  for(const id of ['loraSelect','surpriseLoraSelect'])if($(id))$(id).onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$(id).value;if(state.settings.lora.path&&$('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();if(state.settings.lora.path)inspectSelectedLora(state.settings.lora.path);};
+  for(const id of ['loraSelect','surpriseLoraSelect'])if($(id))$(id).onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$(id).value;if(state.settings.lora.path&&$('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();if(state.settings.lora.path)return inspectSelectedLora(state.settings.lora.path,true);};
   if($('refreshSurpriseLoras'))$('refreshSurpriseLoras').onclick=()=>busy('refreshSurpriseLoras',refreshLoras);
   $('loraStrength').oninput=()=>{state.settings.lora.strength=Number($('loraStrength').value);syncLoras();save();};
   $('loraAutoTrigger').onchange=()=>{state.settings.lora.auto_trigger=$('loraAutoTrigger').checked;syncLoras();save();};
   $('useLocalLora').onclick=()=>busy('useLocalLora',async()=>{
+    const previousStyle=loraStyleSnapshot();
     const path=$('loraLocalPath').value.trim().replace(/^"(.*)"$/,'$1');
     const info=await api('/api/loras/inspect',{path});
     localLoras.set(info.path,{...info,name:loraName(info.path)});
-    state.settings.lora.path=info.path;if($('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();toast('LoRA selected for future songs.');
+    state.settings.lora.path=info.path;if($('surpriseLockStyle'))$('surpriseLockStyle').checked=true;loraListError='';syncLoras();save();offerLoraTrainingStyle(info,previousStyle);toast('LoRA selected for future songs.');
   });
   refreshLoras();
 }

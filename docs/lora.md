@@ -59,6 +59,14 @@ protection. GPU/audio quality testing with a trained adapter remains a separate
 validation step.
 # Surprise me
 
+New Style Trainer checkpoints and final adapters embed the shared training style
+in safetensors metadata. Selecting an adapter offers that style in both the main
+Style box and Surprise me Style direction. Empty boxes fill automatically;
+replacing existing descriptions requires confirmation. Both remain editable,
+and background refreshes never overwrite edits. Legacy Style adapters can read
+their style from the referenced versioned setup on this PC without changing
+adapter bytes. Without metadata or that setup, descriptions are left unchanged.
+
 **Keep this style unchanged** defaults on when selecting a LoRA. Supply your
 training style in Style direction: the renderer uses that text instead of the
 LLM's generated style, while new titles and lyrics are still written. Automatic

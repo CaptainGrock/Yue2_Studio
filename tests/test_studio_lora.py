@@ -21,7 +21,7 @@ def adapter(tmp_path):
     path = folder / 'test_style.safetensors'
     save_file({'diffusion_model.llm2vae.lora_down.weight':torch.ones(2, 16),
                'diffusion_model.llm2vae.lora_up.weight':torch.ones(64, 2)},path,
-              metadata={'format':'comfyui-native-lora','trigger_word':'my_sound'})
+              metadata={'format':'comfyui-native-lora','trigger_word':'my_sound','training_style':'Warm guitars, expressive mezzo'})
     return path
 
 
@@ -29,6 +29,21 @@ def payload(adapter):
     settings = defaults()
     settings['lora'].update(path=str(adapter), strength=.75)
     return {'request':{'style':'piano pop','lyrics':'[Verse]\nHello','seed':42},'settings':settings}
+
+
+def test_legacy_training_style_lookup_is_read_only(tmp_path,monkeypatch):
+    monkeypatch.setattr(loras,'ROOT',tmp_path)
+    project_id='a'*32
+    folder=tmp_path/'training/projects';folder.mkdir(parents=True)
+    path=folder/(project_id+'.json')
+    path.write_text(json.dumps({'id':project_id,'default_caption':'Original saved style'}))
+    original=path.read_bytes()
+    metadata={'format':'yue2-lora-v1','project_id':project_id}
+    assert loras.training_style(metadata)=='Original saved style'
+    assert path.read_bytes()==original
+    assert loras.training_style({**metadata,'training_style':'Embedded style'})=='Embedded style'
+    assert loras.training_style({**metadata,'project_id':'../../outside'})==''
+    assert loras.training_style({})==''
 
 
 def test_discovery_excludes_wrong_models_and_corrupt_files(adapter, tmp_path, monkeypatch):
@@ -39,6 +54,8 @@ def test_discovery_excludes_wrong_models_and_corrupt_files(adapter, tmp_path, mo
     result = loras.catalogue()
     assert len(result['loras']) == 1 and len(result['rejected']) == 2
     assert result['loras'][0]['trigger_word'] == 'my_sound'
+    assert result['loras'][0]['training_style'] == 'Warm guitars, expressive mezzo'
+    assert loras.inspect_adapter(str(adapter))['training_style'] == 'Warm guitars, expressive mezzo'
 
 
 def test_queue_snapshot_trigger_and_restore(adapter, tmp_path):

@@ -48,8 +48,9 @@ def test_gradients_frozen_base_export_and_inference_roundtrip(tiny,tmp_path):
         if isinstance(actual,worker.TrainLinear):actual=actual.base
         assert torch.equal(getattr(actual,key),value),name
     path = tmp_path/'trained.safetensors'
-    worker.export_adapter(adapters,path,{'trigger_word':'test','alpha':'2','step':'2'})
+    worker.export_adapter(adapters,path,{'trigger_word':'test','alpha':'2','step':'2','training_style':'Warm guitars\n[Harmony]'})
     adapter = AcousticLoRA.read(path)
+    assert adapter.metadata['training_style']=='Warm guitars\n[Harmony]'
     trained = type(tiny).nar_velocity.__wrapped__(tiny,*seq,clean,0.).detach()
     for name,module in adapters.items():
         parent,key=name.rsplit('.',1)
