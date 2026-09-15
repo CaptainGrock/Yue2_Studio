@@ -147,7 +147,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
-            elif path in ('/','/index.html','/app.js','/models.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/library.js','/models.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)
@@ -221,6 +221,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.json({'settings':validate_settings(data)})
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/cancel',path):
                 self.json(self.server.jobs.cancel(path.split('/')[3]))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/star',path):
+                if set(data) != {'starred'}:
+                    raise ValueError('Expected only the starred field.')
+                self.json(self.server.jobs.set_starred(path.split('/')[3],data['starred']))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/rename',path):
+                if set(data) != {'title'}:
+                    raise ValueError('Expected only the title field.')
+                self.json(self.server.jobs.rename(path.split('/')[3],data['title']))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/delete',path):
                 self.json(self.server.jobs.delete(path.split('/')[3]))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/retry',path):

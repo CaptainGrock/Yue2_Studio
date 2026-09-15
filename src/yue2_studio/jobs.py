@@ -115,6 +115,7 @@ class JobManager:
         for path in self.root.glob('*/job.json'):
             try:
                 job = json.loads(path.read_text(encoding='utf-8'))
+                job.setdefault('starred',False)
                 if job.get('kind')=='generation' and 'backend' not in job:
                     try:
                         input_data = json.loads((path.parent/'input.json').read_text(encoding='utf-8'))
@@ -147,7 +148,7 @@ class JobManager:
             directory = self.root/job_id
             directory.mkdir(exist_ok=False)
             write_json(directory/'input.json',spec)
-            job = dict(id=job_id,kind=kind,title=spec['title'],status='queued',created=now(),stage=spec.get('stage','transcribe'),mode=spec.get('mode','cover'))
+            job = dict(id=job_id,kind=kind,title=spec['title'],status='queued',created=now(),starred=False,stage=spec.get('stage','transcribe'),mode=spec.get('mode','cover'))
             if kind=='generation':
                 job['backend'] = spec['settings']['runtime']['backend']
             self.jobs[job_id] = job
@@ -222,6 +223,29 @@ class JobManager:
                         job['status']='running'
                         raise
             self._persist(job)
+            return deepcopy(job)
+
+    def set_starred(self,job_id,starred):
+        """Persist library metadata only; never alter a running worker or input."""
+        if type(starred) is not bool:
+            raise ValueError('Starred must be true or false.')
+        with self.lock:
+            self.directory(job_id)
+            job = self.jobs[job_id]
+            self._persist({**job,'starred':starred})
+            job['starred'] = starred
+            return deepcopy(job)
+
+    def rename(self,job_id,title):
+        """Change the library label without rewriting render inputs or artifacts."""
+        if not isinstance(title,str) or not title.strip() or len(title.strip())>180:
+            raise ValueError('Song name must contain 1 to 180 characters.')
+        title = title.strip()
+        with self.lock:
+            self.directory(job_id)
+            job = self.jobs[job_id]
+            self._persist({**job,'title':title})
+            job['title'] = title
             return deepcopy(job)
 
     def delete(self,job_id):
