@@ -34,6 +34,9 @@ vm.runInContext(fs.readFileSync('src/yue2_studio/static/trainer.js','utf8'),cont
  assert.equal(calls.filter(c=>c.url==='/api/trainer/train').length,1);
  assert.equal(calls.find(c=>c.url==='/api/trainer/download').data.confirmed,true);
  const html=fs.readFileSync('src/yue2_studio/static/index.html','utf8');
+ const mainNav=html.match(/<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/)[1];
+ assert.deepEqual([...mainNav.matchAll(/data-view="([^"]+)"/g)].map(match=>match[1]),['create','trainer','library']);
+ assert.equal((html.match(/data-view="trainer"/g)||[]).length,1,'Only one Style trainer navigation entry');
  assert(!html.includes('trainerGoal'),'Do not offer a cosmetic training-goal selector');
  assert.match(html,/id="trainerSteps"[^>]*value="2000"/);
  assert.match(html,/id="trainerCheckpoint"[^>]*value="500"/);
