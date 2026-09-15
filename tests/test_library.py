@@ -86,6 +86,9 @@ class LibraryTests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
+                with urlopen(f'http://127.0.0.1:{server.server_port}/library.js') as script:
+                    self.assertEqual(script.status, 200)
+                    self.assertIn(b'function libraryDateMatches', script.read())
                 def post(data, token=True, job_id=key, action='star'):
                     headers = {'Content-Type': 'application/json'}
                     if token:
