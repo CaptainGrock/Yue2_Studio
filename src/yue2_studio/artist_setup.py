@@ -53,10 +53,22 @@ def cpu_env():
 
 def run_command(args, *, offline=True):
     env=cpu_env()
+    # Ignore unrelated global pip indexes/trusted-host settings; keep TLS checks.
+    for key in ('PIP_INDEX_URL','PIP_EXTRA_INDEX_URL','PIP_TRUSTED_HOST'):
+        env.pop(key,None)
+    env['PIP_CONFIG_FILE']=os.devnull
+    env['PIP_USE_FEATURE']='truststore'  # Also inherited by pip build subprocesses.
+    args=[str(a) for a in args]
+    if args[1:3]==['-m','pip']:args.insert(3,'--use-feature=truststore')
     if not offline:
         env.pop('HF_HUB_OFFLINE',None);env.pop('TRANSFORMERS_OFFLINE',None)
-    return subprocess.run([str(a) for a in args],check=True,env=env,capture_output=True,text=True,
-                          creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+    try:
+        return subprocess.run(args,check=True,env=env,capture_output=True,text=True,
+                              creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+    except subprocess.CalledProcessError as exc:
+        print((exc.stdout or '')[-12000:],flush=True)
+        print((exc.stderr or '')[-12000:],file=sys.stderr,flush=True)
+        raise
 
 
 def write_record(path,data):
@@ -101,7 +113,8 @@ def model_paths(overrides=None):
 def download_models(*, confirmed=False, terms_accepted=False, paths=None):
     if confirmed is not True or terms_accepted is not True:
         raise ValueError('Confirm downloads and review/accept the model terms first.')
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import hf_hub_download
+    from huggingface_hub.utils import EntryNotFoundError
     resolved={}
     for kind,folder in model_paths(paths).items():
         if Path(folder).exists():
@@ -111,10 +124,15 @@ def download_models(*, confirmed=False, terms_accepted=False, paths=None):
         asset=ASSETS[kind]
         target=ROOT/'models/artist-cache'/kind/asset['revision']
         print(f'Artist setup: downloading {kind} at {asset["revision"]}',flush=True)
-        downloaded=snapshot_download(asset['repo'],revision=asset['revision'],repo_type=asset.get('repo_type','model'),
-            token=False,local_dir=str(target),allow_patterns=list(asset['files'])+asset['support']+
-            ['README.md','LICENSE','THIRD_PARTY_NOTICES.md','licenses/*'])
-        resolved[kind]=verify_asset(kind,downloaded)
+        required=set(asset['files'])|set(REQUIRED[kind])
+        names=required|set(asset['support'])|{'README.md','LICENSE','THIRD_PARTY_NOTICES.md'}
+        for name in sorted(names):
+            try:
+                hf_hub_download(asset['repo'],filename=name,revision=asset['revision'],
+                    repo_type=asset.get('repo_type','model'),token=False,local_dir=str(target))
+            except EntryNotFoundError:
+                if name in required:raise
+        resolved[kind]=verify_asset(kind,target)
     record={'paths':resolved,'revisions':{k:v['revision'] for k,v in ASSETS.items()}}
     write_record(ROOT/'training/artist-models.json',record)
     return record

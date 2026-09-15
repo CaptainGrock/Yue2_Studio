@@ -23,6 +23,29 @@ def test_explicit_confirmations_precede_any_changes(root,monkeypatch):
     assert not list(root.iterdir())
 
 
+def test_pip_uses_system_trust_without_unrelated_indexes(root,monkeypatch):
+    monkeypatch.setenv('PIP_EXTRA_INDEX_URL','https://unrelated.invalid/simple')
+    monkeypatch.setenv('PIP_TRUSTED_HOST','unrelated.invalid')
+    seen={}
+    def run(args,**kwargs):
+        seen.update(args=args,**kwargs)
+        return SimpleNamespace(stdout='ok')
+    monkeypatch.setattr(setup.subprocess,'run',run)
+    setup.run_command(['python','-m','pip','check'])
+    assert '--use-feature=truststore' in seen['args']
+    assert seen['env']['PIP_USE_FEATURE']=='truststore'
+    assert 'PIP_EXTRA_INDEX_URL' not in seen['env'] and 'PIP_TRUSTED_HOST' not in seen['env']
+    assert seen['env']['CUDA_VISIBLE_DEVICES']==''
+
+
+def test_required_download_missing_is_not_published(root,monkeypatch):
+    import huggingface_hub
+    from huggingface_hub.utils import EntryNotFoundError
+    monkeypatch.setattr(huggingface_hub,'hf_hub_download',lambda *a,**kw:(_ for _ in ()).throw(EntryNotFoundError('missing')))
+    with pytest.raises(EntryNotFoundError):setup.download_models(confirmed=True,terms_accepted=True)
+    assert not (root/'training/artist-models.json').exists()
+
+
 def test_checks_are_read_only_and_do_not_initialize_gpu(root,monkeypatch):
     monkeypatch.setattr(setup,'run_command',lambda *a,**k:pytest.fail('Missing runtime must not be launched'))
     result=setup.check_setup()
@@ -41,17 +64,17 @@ def test_model_reuse_and_download_are_pinned_and_verified_before_publication(roo
         kind=next(k for k,v in setup.ASSETS.items() if v['repo']==repo)
         assert kwargs['revision']==setup.ASSETS[kind]['revision']
         assert kwargs['token'] is False and 'cache_dir' not in kwargs
-        assert 'scripts/*' not in kwargs['allow_patterns']
+        assert not kwargs['filename'].startswith('scripts/')
         calls.append(kind)
         return kwargs['local_dir']
     def verify(kind,folder):
         verified.append(kind)
         assert not (root/'training/artist-models.json').exists()
         return str(folder)
-    monkeypatch.setattr(huggingface_hub,'snapshot_download',download)
+    monkeypatch.setattr(huggingface_hub,'hf_hub_download',download)
     monkeypatch.setattr(setup,'verify_asset',verify)
     result=setup.download_models(confirmed=True,terms_accepted=True,paths={'model':str(local)})
-    assert 'model' not in calls and len(calls)==4 and len(verified)==5
+    assert 'model' not in calls and len(set(calls))==4 and len(verified)==5
     assert result['paths']['model']==str(local)
     assert json.loads((root/'training/artist-models.json').read_text())==result
 
@@ -62,7 +85,7 @@ def test_bad_existing_model_is_not_overwritten_and_registry_survives(root,monkey
     registry=root/'training/artist-models.json';registry.parent.mkdir()
     registry.write_text(json.dumps({'paths':{'model':str(local)}}))
     original=registry.read_bytes()
-    monkeypatch.setattr(huggingface_hub,'snapshot_download',lambda *a,**k:pytest.fail('Do not repair local files'))
+    monkeypatch.setattr(huggingface_hub,'hf_hub_download',lambda *a,**k:pytest.fail('Do not repair local files'))
     with pytest.raises(ValueError):setup.download_models(confirmed=True,terms_accepted=True)
     assert registry.read_bytes()==original
 
@@ -80,7 +103,7 @@ def test_failed_transfer_keeps_previous_registry(root,monkeypatch):
     import huggingface_hub
     registry=root/'training/artist-models.json';registry.parent.mkdir()
     registry.write_text('{"paths":{}}');before=registry.read_bytes()
-    monkeypatch.setattr(huggingface_hub,'snapshot_download',lambda *a,**k:(_ for _ in ()).throw(OSError('offline')))
+    monkeypatch.setattr(huggingface_hub,'hf_hub_download',lambda *a,**k:(_ for _ in ()).throw(OSError('offline')))
     with pytest.raises(OSError):setup.download_models(confirmed=True,terms_accepted=True)
     assert registry.read_bytes()==before
 

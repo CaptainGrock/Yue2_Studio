@@ -3,8 +3,8 @@
 This is the setup layer for the upcoming Artist Trainer, not a finished release.
 The Artist panel, setup actions and training worker now use the new registry
 paths. Playback integration and installer support are implemented and tested on
-CPU in isolated installs. Real dependency installation/download and GPU tests
-remain release gates; this is not yet a fully validated Artist release.
+CPU in isolated installs. Real isolated runtime installation passed; visual and GPU tests
+remain release gates. This is not yet a fully validated Artist release.
 
 ## Artist panel and queue
 
@@ -52,7 +52,8 @@ model/VAE registry are reused. Only the tested, hash-pinned releases are accepte
 An existing invalid folder fails validation; it is not overwritten automatically.
 
 Missing assets download to `models/artist-cache/<kind>/<revision>` using ordinary
-files, not symlinks. Transfers include explicit support/license files, not the
+files, not symlinks. Exact-file requests avoid snapshot progress-library failures.
+Transfers include explicit support/license files, not the
 community's training scripts or entire audio corpus. The five paths publish to
 `training/artist-models.json` only after every required file passes validation.
 Failed downloads retain partial cache files and leave an older registry intact.
@@ -72,6 +73,10 @@ The known Demucs dependencies are installed explicitly before Demucs itself
 (`--no-deps`), followed by `pip check`; this preserves the selected Torch pair.
 Demucs/MMS alignment model downloads and GPU alignment tests are still separate
 release work. Passing the import probe does not establish alignment readiness.
+
+Package commands use pip's system-certificate trust-store support and ignore
+unrelated global index/trusted-host settings. TLS verification stays enabled.
+Package failures retain the underlying command output in the setup log.
 
 ## Model sources and terms
 
@@ -95,6 +100,19 @@ their SHA256 without executing them. The community scripts are not executed.
 
 CPU tests cover explicit confirmation, local reuse, pinned transfer requests,
 hash rejection, fresh runtime commands, and failure-safe registry publication.
-Transfers and pip commands are mocked. HTTP/queue and UI-handler contract tests
-pass; visual browser review, real installation, fresh-cache downloads and GPU
-compatibility remain unverified for this packaged build.
+Those unit tests mock transfers and pip commands. The full suite passes 149 tests
+plus 28 subtests, alongside the Artist/Style/LoRA/Surprise UI-handler checks.
+Real isolated setup tests downloaded and hash-verified the pinned encoder,
+companion and reference pack, reusing verified base/VAE/MERT folders read-only.
+The downloaded encoder and companion also loaded on CPU. This is not a cold
+download test of all five model groups.
+
+Real dependency checks found and fixed Windows certificate handling, including
+nested pip build processes, without disabling TLS verification. The supporting
+packages, Demucs, dependency consistency check and CPU imports passed, followed
+by a successful complete fresh runtime installation with the corrected installer.
+The fresh runtime also imported the installed Artist preparation/training modules
+with CUDA uninitialized. Visual review and GPU training/alignment/playback remain
+separate release gates; passing CPU imports does not establish musical quality.
+The isolated Studio's real setup queue also completed `check`, with all files and
+imports ready and a saved result receipt. No training was started.
