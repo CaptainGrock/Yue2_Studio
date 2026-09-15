@@ -62,7 +62,7 @@ def score_check(text, strip=False, keep_voice='both'):
 
 
 def generation_spec(payload):
-    if set(payload)-{'title','mode','stage','request','settings','source_job'}:
+    if set(payload)-{'title','mode','stage','request','settings','source_job','lora'}:
         raise ValueError('Unknown generation fields.')
     settings = validate_settings(payload.get('settings',{}))
     request = dict(payload.get('request',{}))
@@ -75,6 +75,8 @@ def generation_spec(payload):
     request.setdefault('id','song')
     if isinstance(request.get('seed'),str) and re.fullmatch(r'[0-9]{1,19}',request['seed']):
         request['seed'] = int(request['seed'])
+    from .loras import prepare
+    lora = prepare(settings, request, payload.get('lora'))
     from yue2.protocol import SongRequest
     req = SongRequest(**request)
     if not req.style.strip():
@@ -96,7 +98,7 @@ def generation_spec(payload):
         score = parse_abc(req.abc)
         if req.cot=='melody' and any(v.chords for v in score.voices.values()):
             raise ValueError('The score still contains chords. Use Prepare melody, or choose Full to retain harmony.')
-    return {'request':req.to_dict(),'settings':settings,'stage':stage,'mode':mode,
+    return {**({'lora':lora} if lora else {}), 'request':req.to_dict(),'settings':settings,'stage':stage,'mode':mode,
             'title':str(payload.get('title') or 'Untitled song')[:180], 'source_job':str(payload.get('source_job') or '')[:100]}
 
 
@@ -151,10 +153,22 @@ class JobManager:
             job = dict(id=job_id,kind=kind,title=spec['title'],status='queued',created=now(),starred=False,stage=spec.get('stage','transcribe'),mode=spec.get('mode','cover'))
             if kind=='generation':
                 job['backend'] = spec['settings']['runtime']['backend']
+                if spec.get('lora'):
+                    job['lora'] = deepcopy(spec['lora'])
             self.jobs[job_id] = job
             self._persist(job)
             self.queue.put(job_id)
             return deepcopy(job)
+
+    def train(self,payload):
+        from .trainer import training_spec
+        return self._add('training',training_spec(payload))
+
+    def download_training_models(self):
+        with self.lock:
+            if any(job['kind']=='trainer_setup' and job['status'] in ('queued','running','cancelling') for job in self.jobs.values()):
+                raise ValueError('Training-model download is already queued or running.')
+            return self._add('trainer_setup',dict(title='Download Style Trainer models',stage='setup',mode='trainer'))
 
     def generate(self,payload):
         return self._add('generation',generation_spec(payload))
@@ -202,7 +216,7 @@ class JobManager:
         job['artifacts'] = [str(p.relative_to(directory)).replace('\\','/') for p in sorted(result.rglob('*')) if p.is_file()] if result.exists() else []
         if (result/'score.abc').exists():
             job['abc'] = (result/'score.abc').read_text(encoding='utf-8')
-        for name in ('result.json','studio_summary.json','transcription_manifest.json'):
+        for name in ('result.json','studio_summary.json','transcription_manifest.json','training.json','training_models.json'):
             path = result/name
             if path.is_file():
                 job.setdefault('receipts',{})[name] = json.loads(path.read_text(encoding='utf-8'))
@@ -218,7 +232,10 @@ class JobManager:
                 job['status']='cancelling'
                 if self.active_id==job_id and self.process and self.process.poll() is None:
                     try:
-                        terminate_worker(self.process)
+                        if job['kind']=='training':
+                            (self.directory(job_id)/'cancel.request').touch()
+                        else:
+                            terminate_worker(self.process)
                     except Exception:
                         job['status']='running'
                         raise
@@ -260,6 +277,10 @@ class JobManager:
 
     def _command(self,job_id,spec):
         directory = self.directory(job_id)
+        if self.jobs[job_id]['kind']=='trainer_setup':
+            return [sys.executable,'-u','-m','yue2_studio.trainer_setup',str(directory/'input.json')]
+        if self.jobs[job_id]['kind']=='training':
+            return [sys.executable,'-u','-m','yue2_studio.training_worker',str(directory/'input.json')]
         if self.jobs[job_id]['kind']=='generation':
             return [sys.executable,'-u','-m','yue2_studio.worker',str(directory/'input.json')]
         opts = dict(spec['settings']['transcription'])
@@ -354,3 +375,7 @@ class JobManager:
             self.queue.put(None)
         if self.thread.is_alive():
             self.thread.join(timeout=10)
+        # Training cancels cooperatively, but shutdown must not orphan a GPU worker.
+        with self.lock:
+            if self.process and self.process.poll() is None:
+                terminate_worker(self.process)

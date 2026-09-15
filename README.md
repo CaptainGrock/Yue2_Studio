@@ -1,7 +1,7 @@
 # YuE2 Studio · Beta
 
 A local web studio for **YuE2** with original songs, melody covers, an LLM writing room,
-automatic song batches, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
+automatic song batches, experimental Style LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
 no Gradio, Node build, or extra runtime Python dependencies beyond the installed engines.
 
 **Beta preview:** tested on Windows with an RTX 5090. Other hardware configurations
@@ -47,6 +47,12 @@ Your-YuE2-folder/
     install_studio.py
 ```
 
+The installer also installs acoustic LoRA support in `src/yue2/pipeline.py` and
+`src/yue2/lora.py`. It refuses an unfamiliar/custom pipeline instead of overwriting
+it. The supported baseline is the upstream commit above; keep a separate copy of
+any custom engine changes. See [Style Trainer setup](docs/trainer.md) and
+[LoRA playback](docs/lora.md). These are Studio extensions, not upstream training APIs.
+
 The installer modifies `src/yue2/cuda_graph.py` to detect builds without compiled
 Flash Attention, keeping fast CUDA graphs through cuDNN/SDPA. It also installs the
 Studio package, launcher, and score/transcription helper scripts. Existing files
@@ -77,6 +83,10 @@ Hub IDs `m-a-p/YuE2-3B` and `m-a-p/YuE2-Vae`; disable Offline model loading if d
 are needed. Paths are resolved locally; this repository includes no weights.
 
 - **New song:** enter style and section-tagged lyrics, then create music.
+- **Style trainer:** check setup, select local songs and a shared style, save the
+  setup, then explicitly queue training. Successful adapters appear in the creation
+  area's Style LoRA list. Full PyTorch weights and a BF16 NVIDIA GPU are required;
+  LoRAs do not work with GGUF. Missing weights can be downloaded through the trainer.
 - **Writing room:** choose an LLM provider, refresh its model list, enter your own
   API key or local endpoint, and generate/edit lyrics and styles.
 - **Surprise me:** choose batch size, vocal gender, style, language and optional

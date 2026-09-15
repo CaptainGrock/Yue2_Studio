@@ -116,6 +116,13 @@ FIXED = [
 ]
 
 
+GROUPS.append(dict(id='lora', title='Style LoRA', subtitle='Experimental acoustic style adapters for the Python engine.', fields=[
+    field('path', 'LoRA file', '', 'Full path to a compatible YuE2 acoustic .safetensors adapter. Blank uses the base model. Other model adapters are incompatible.'),
+    field('strength', 'LoRA strength', 1.0, '0 applies no effect. Lower strengths are subtler; above 1 may emphasize the learned sound but can introduce distortion or reduce coherence. There is no universal failure threshold.', minimum=0, maximum=2, step=.05),
+    field('auto_trigger', 'Include trigger phrase', True, 'Include the adapter’s recorded trigger phrase in the submitted style if it is not already present. The style editor stays unchanged.'),
+]))
+
+
 def defaults():
     return {group['id']: {f['key']: f['default'] for f in group['fields']} for group in GROUPS}
 
