@@ -1,8 +1,8 @@
 # YuE2 Studio · Beta
 
 A local web studio for **YuE2** with original songs, melody covers, an LLM writing room,
-automatic song batches, experimental Style LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
-no Gradio, Node build, or extra runtime Python dependencies beyond the installed engines.
+automatic song batches, experimental Style and Artist LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
+no Gradio or Node build. Artist training has a separate, explicitly installed runtime.
 
 **Beta preview:** tested on Windows with an RTX 5090. Other hardware configurations
 are still being validated. GGUF and lower-VRAM presets remain experimental.
@@ -53,6 +53,15 @@ it. The supported baseline is the upstream commit above; keep a separate copy of
 any custom engine changes. See [Style Trainer setup](docs/trainer.md) and
 [LoRA playback](docs/lora.md). These are Studio extensions, not upstream training APIs.
 
+The experimental [Artist Trainer](docs/artist-trainer.md) adds full-song lyric
+conditioning and AR adapters with a pinned community acoustic companion. Follow
+[Artist setup](docs/artist-setup.md) for separate dependencies, model paths and
+terms. Playback requires No score, Torch, no quantization and AR offloading off;
+GGUF and arbitrary adapter stacking are unsupported. The installer also accepts
+the known merged Style Trainer pipeline, with backups, but rejects unfamiliar
+Artist adapter code. Fresh isolated setup, alignment, short GPU training and playback
+tests passed on an RTX 5090; see the documented [verification limits](docs/artist-setup.md#validation-status).
+
 The installer modifies `src/yue2/cuda_graph.py` to detect builds without compiled
 Flash Attention, keeping fast CUDA graphs through cuDNN/SDPA. It also installs the
 Studio package, launcher, and score/transcription helper scripts. Existing files
@@ -85,8 +94,12 @@ are needed. Paths are resolved locally; this repository includes no weights.
 - **New song:** enter style and section-tagged lyrics, then create music.
 - **Style trainer:** check setup, select local songs and a shared style, save the
   setup, then explicitly queue training. Successful adapters appear in the creation
-  area's Style LoRA list. Full PyTorch weights and a BF16 NVIDIA GPU are required;
+  area's Style / Artist LoRA list. Full PyTorch weights and a BF16 NVIDIA GPU are required;
   LoRAs do not work with GGUF. Missing weights can be downloaded through the trainer.
+- **Artist trainer:** prepare its separate runtime/model paths, review matching
+  full-song lyric files, save a setup and explicitly queue training. Defaults are
+  500 steps and save every 250. Playback loads your Artist adapter and its pinned
+  companion together. [Walkthrough](docs/artist-trainer.md).
 - **Writing room:** choose an LLM provider, refresh its model list, enter your own
   API key or local endpoint, and generate/edit lyrics and styles.
 - **Surprise me:** choose batch size, vocal gender, style, language and optional
@@ -142,8 +155,15 @@ tradeoff; fewer synthesis steps and shorter token limits change the result, so t
 are documented options rather than hidden speed tricks. Existing saved drafts
 retain their settings; use Restore defaults in Advanced settings to adopt new defaults.
 
-For memory failures, enable **Offload autoregressive model**, then generate again.
-This trades weight-transfer time for lower synthesis memory use. Keep `torch` enabled.
+For ordinary generation memory failures, **Offload autoregressive model** trades
+weight-transfer time for lower synthesis memory use. Keep `torch` enabled.
+**Artist LoRAs require AR offloading disabled**; free competing GPU workloads and
+check the supported settings instead of enabling that option for an Artist bundle.
+
+**Same seed does not guarantee the same song.** No score/Torch baseline-only tests
+varied with identical seed, style, lyrics and settings. The exact cause is not yet
+established. Retain original outputs and compare multiple baseline/LoRA pairs;
+see [comparison guidance](docs/studio.md#seeds-and-comparing-results).
 
 ## Updates and shutdown
 
@@ -164,6 +184,7 @@ Your runs stay under the parent `runs/studio/`; keys are entered per browser ses
 
 - [Full workflow guide](docs/studio.md)
 - [Every advanced setting, defaults, performance and troubleshooting](docs/settings.md)
+- [Style Trainer](docs/trainer.md) · [Artist Trainer](docs/artist-trainer.md) · [LoRA playback](docs/lora.md)
 - [Official YuE2 music skill and formatting](https://github.com/multimodal-art-projection/YuE/tree/main/skills/yue2-music)
 
 ## License and credits
@@ -178,6 +199,9 @@ This repository contains no songs, uploads, API keys, caches or Python environme
 The server is local-only; cloning gives each user their own studio, not access to yours.
 
 ## See the Studio
+
+Some images show earlier layouts. The new trainer, LoRA, library and appearance
+captures are appended below, with captions explaining workspace-only details.
 
 | Create a song | Create a cover |
 | --- | --- |
@@ -200,3 +224,33 @@ The server is local-only; cloning gives each user their own studio, not access t
 ![GPU memory preset with the effective budget](images/gpu-memory-preset.png)
 
 Click any screenshot to see it full size. The [illustrated guide](docs/studio.md) walks through each screen.
+
+### Trainers, library and experimental controls
+
+These screenshots show the author's workspace. Example paths/project names are
+not bundled datasets. The recovery shortcuts and historical verification banner
+shown in that workspace are not release controls/status. Artist defaults are now
+**500 steps / save every 250**, not the older 800/200 shown below.
+
+| Style dataset | Style training controls |
+| --- | --- |
+| ![Choose songs and a clip length for Style training](images/style-trainer-dataset.png) | ![Style training steps, rank, learning rate and checkpoints](images/style-trainer-controls.png) |
+
+![Reopen a saved training setup](images/saved-training-projects.png)
+
+| Artist dataset and lyrics | Artist training controls |
+| --- | --- |
+| ![Artist song folder, lyric pairing, trigger and shared style](images/artist-trainer-dataset.png) | ![Artist training controls; screenshot values are not the current defaults](images/artist-trainer-controls.png) |
+
+![Style or Artist LoRA selection](images/lora-selector.png)
+
+![Shape the generation experimental sliders](images/shape-generation.png)
+
+Composition, Performance and Style influence map to existing advanced settings.
+Click **?** for explanations and cautions. The current UI corrects the screenshot's
+comparison hint: **same seed does not guarantee identical music**.
+[Slider settings and limits](docs/settings.md#shape-the-generation).
+
+![Song library with stars, title editing, search and date filters](images/song-library.png)
+
+![Studio appearance presets](images/appearance-presets.png)

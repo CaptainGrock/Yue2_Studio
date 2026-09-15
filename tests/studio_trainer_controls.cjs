@@ -35,7 +35,7 @@ vm.runInContext(fs.readFileSync('src/yue2_studio/static/trainer.js','utf8'),cont
  assert.equal(calls.find(c=>c.url==='/api/trainer/download').data.confirmed,true);
  const html=fs.readFileSync('src/yue2_studio/static/index.html','utf8');
  const mainNav=html.match(/<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/)[1];
- assert.deepEqual([...mainNav.matchAll(/data-view="([^"]+)"/g)].map(match=>match[1]),['create','trainer','library']);
+ assert.deepEqual([...mainNav.matchAll(/data-view="([^"]+)"/g)].map(match=>match[1]),['create','trainer','artist','library']);
  assert.equal((html.match(/data-view="trainer"/g)||[]).length,1,'Only one Style trainer navigation entry');
  assert(!html.includes('trainerGoal'),'Do not offer a cosmetic training-goal selector');
  assert.match(html,/id="trainerSteps"[^>]*value="2000"/);
@@ -50,6 +50,6 @@ vm.runInContext(fs.readFileSync('src/yue2_studio/static/trainer.js','utf8'),cont
    for(const match of script.matchAll(/\$\('([^']+)'\)/g))assert(ids.includes(match[1]),'Missing UI element '+match[1]);
    assert(html.indexOf('src="/'+file+'"')<html.indexOf('src="/app.js"'));
  }
- assert(!html.includes('artistView'));assert(!html.includes('trainerRecovered'));
+ assert(html.includes('artistView'));assert(!html.includes('trainerRecovered'));
  console.log('Trainer controls passed: saved snapshot, numeric controls, model paths, queue status, HTML contract.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

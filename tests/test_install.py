@@ -29,6 +29,16 @@ class InstallTests(unittest.TestCase):
    self.assertTrue((root/'src/yue2/lora.py').is_file())
    self.assertTrue((root/'src/yue2_studio/training_worker.py').is_file())
    self.assertTrue((root/'src/yue2_studio/static/trainer.js').is_file())
+   self.assertTrue((root/'src/yue2/artist_lora.py').is_file())
+   self.assertTrue((root/'src/yue2_studio/static/artist.js').is_file())
+   self.assertTrue((root/'docs/artist-trainer.md').is_file())
+
+ def test_custom_artist_adapter_is_preserved(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);self.kit(root)
+   adapter=root/'src/yue2/artist_lora.py';adapter.write_text('# custom Artist implementation')
+   with self.assertRaisesRegex(ValueError,'artist_lora.py'):installer.install(root)
+   self.assertEqual(adapter.read_text(),'# custom Artist implementation')
 
  def test_custom_engine_is_never_overwritten(self):
   with tempfile.TemporaryDirectory() as tmp:

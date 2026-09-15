@@ -8,8 +8,15 @@ Defaults favor the fast validated execution path. Speed, memory, output length a
 
 ## Everyday controls
 
+See [Shape the generation](#shape-the-generation) for the experimental preset sliders.
+
+**Artist LoRA exception:** playback requires No score, Torch/Torch-eager,
+quantization None and AR offloading disabled. Memory presets can change offloading;
+recheck it before rendering. These generation settings do not tune Artist training.
+See [Artist controls](artist-trainer.md#training-controls-and-progress).
+
 - **Full / melody / off:** full plans harmony and melody, melody plans lead melody, off skips score planning. Off avoids planner time but changes conditioning.
-- **Seed:** reuse for reproducibility within the same environment/settings. Different attention kernels may produce different sampled songs.
+- **Seed:** records a sampling condition, not an exact replay guarantee. Tested No score/Torch runs varied even with identical seed, style, lyrics and settings and no LoRA. The exact cause is unconfirmed. Preserve original audio and compare multiple pairs; see [comparison guidance](studio.md#seeds-and-comparing-results).
 - **Style:** language, genre, vocal delivery, instruments, groove and BPM. Use lyrics for words and section tags.
 - **LLM runner:** provider/model discovery, endpoint and API key; maximum output tokens caps the writing response, timeout controls waiting, temperature controls text variation, local context controls local LLM memory. These do not change Yue2 sampling.
 - **Surprise me:** 1–50 songs, vocal gender, style, language. Require strong profanity checks at least 3 uncensored strong English swear-word occurrences in sung lines before rendering. A failed draft/render stops the remainder.
@@ -185,3 +192,31 @@ suggests Q4 for 8 GB and Q8 for the larger listed capacities. Select the suggest
 model through Music models. The preset does not download/switch models or alter
 GGUF graph arenas, whose safe capacities depend on the runtime and request. The
 native budget is retained for when you switch back to Torch.
+
+## Shape the generation
+
+![Experimental generation presets](../images/shape-generation.png)
+
+The screenshot uses older comparison wording. Keep inputs fixed, but compare
+multiple runs: the same seed is not an exact replay guarantee.
+
+These five-position presets change existing Python-engine settings. They are not
+training controls, LoRA-strength controls or a promise of a particular singer.
+Composition is bypassed in No score or with supplied ABC. All are disabled for GGUF.
+Center uses engine defaults; Custom advanced values preserves manual settings.
+Reset sliders resets only the fields below, not token limits or synthesis steps.
+
+| Position | Composition: temperature / top-p / top-k | Performance: temperature / top-p / top-k | Style influence: CFG |
+| --- | --- | --- | --- |
+| 0 · lowest | 0.55 / 0.82 / 16 | 0.8 / 0.88 / 50 | 0.85 |
+| 1 | 0.6 / 0.86 / 24 | 0.9 / 0.92 / 75 | 0.95 |
+| 2 · default | 0.7 / 0.9 / 30 | 1.0 / 0.95 / 100 | Automatic |
+| 3 | 0.85 / 0.94 / 45 | 1.1 / 0.97 / 140 | 1.05 |
+| 4 · highest | 1.0 / 0.97 / 64 | 1.2 / 0.99 / 200 | 1.15 |
+
+Automatic CFG is 1.0 for Full/Melody and 1.01 for No score. Guidance away from 1
+can add a second branch and increase work. More adventurous sampling can trade
+coherence for variation; stronger guidance is not automatically better.
+Click **?** for explanations and caution bands, not hard failure thresholds.
+Values are saved through the usual draft/project/run settings. Existing queued
+jobs and finished songs are not changed by moving a slider.

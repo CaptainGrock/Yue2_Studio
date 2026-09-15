@@ -164,6 +164,17 @@ class JobManager:
         from .trainer import training_spec
         return self._add('training',training_spec(payload))
 
+    def train_artist(self,payload):
+        from .artist_training import training_spec
+        return self._add('artist_training',training_spec(payload))
+
+    def prepare_artist(self,payload):
+        from .artist_setup_worker import setup_spec
+        spec=setup_spec(payload)
+        with self.lock:
+            if any(j['kind']=='artist_setup' and j['status'] in ('queued','running','cancelling') for j in self.jobs.values()):raise ValueError('An Artist setup action is already queued or running.')
+            return self._add('artist_setup',spec)
+
     def download_training_models(self):
         with self.lock:
             if any(job['kind']=='trainer_setup' and job['status'] in ('queued','running','cancelling') for job in self.jobs.values()):
@@ -232,7 +243,7 @@ class JobManager:
                 job['status']='cancelling'
                 if self.active_id==job_id and self.process and self.process.poll() is None:
                     try:
-                        if job['kind']=='training':
+                        if job['kind'] in ('training','artist_training'):
                             (self.directory(job_id)/'cancel.request').touch()
                         else:
                             terminate_worker(self.process)
@@ -277,6 +288,10 @@ class JobManager:
 
     def _command(self,job_id,spec):
         directory = self.directory(job_id)
+        if self.jobs[job_id]['kind']=='artist_setup':
+            return [sys.executable,'-u','-m','yue2_studio.artist_setup_worker',str(directory/'input.json')]
+        if self.jobs[job_id]['kind']=='artist_training':
+            return [spec['python'],'-u','-m','yue2_studio.artist_train_worker',str(directory/'input.json')]
         if self.jobs[job_id]['kind']=='trainer_setup':
             return [sys.executable,'-u','-m','yue2_studio.trainer_setup',str(directory/'input.json')]
         if self.jobs[job_id]['kind']=='training':

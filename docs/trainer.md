@@ -1,6 +1,9 @@
 # Style Trainer: experimental acoustic LoRA training
 
 Open **Style trainer** in the main navigation and enter your local folder of songs.
+This page describes the clip-based acoustic trainer, not the separate
+[Artist Trainer](artist-trainer.md). Style defaults remain 2,000 steps / save every
+500; Artist defaults are 500 / 250.
 Only use recordings you have permission to use for training. Scanning inspects
 files directly in that folder (not subfolders), reads audio headers,
 and estimates complete clips. It does not load a music model,
@@ -24,6 +27,10 @@ and sidecars are unchanged. Saved versions can be reopened in the tab; save a ne
 version to retain changes. Unsaved edits remain only in the current page.
 
 ## Train a saved setup
+
+![Style training controls with 2,000 steps and checkpoints every 500](../images/style-trainer-controls.png)
+
+![Saved training project selector](../images/saved-training-projects.png)
 
 Select a saved project, then choose **Queue training**. This uses that saved
 snapshot, not unsaved form changes. Click the information disclosures beside
@@ -73,7 +80,7 @@ Periodic, stopped and final `.safetensors` adapters live under the run's `result
 folder. They contain LoRA weights, not optimizer/RNG state: exact training resume
 is not implemented. Errors retain previously committed checkpoints. Successful
 final adapters are also installed with unique names under `models/loras`. Refresh
-the creation page's **Style LoRA** list and select the adapter there. Intermediate
+the creation page's **Style / Artist LoRA** list and select the adapter there. Intermediate
 checkpoints can be selected by their local file path. New adapters do not alter
 existing songs or automatically select themselves for future renders.
 
@@ -128,5 +135,10 @@ remain prerequisites of the base YuE2 installation.
 The PR includes CPU-only tests with tiny synthetic models for training gradients,
 frozen base weights, adapter export/import, acoustic synthesis, cancellation,
 queue contracts, installer safety and setup checks. These are not singer-similarity
-or listening-quality tests. A 20-step smoke test is still recommended on each user\'s
+or listening-quality tests. A 20-step smoke test is still recommended on each user's
 hardware before a longer experiment. Do not interpret a small loss as voice cloning.
+
+Keep baseline audio when comparing adapters. Identical seed/style/lyrics/settings
+did not guarantee identical No score/Torch baseline generations in testing, even
+without a LoRA. Compare several pairs, not one small difference, and do not use
+Surprise me to perform a fixed-input test. [Comparison guide](studio.md#seeds-and-comparing-results).

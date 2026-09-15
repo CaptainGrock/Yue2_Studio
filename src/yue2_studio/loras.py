@@ -26,11 +26,11 @@ def training_style(metadata):
 
 def inspect_adapter(path):
     from safetensors import SafetensorError
-    from yue2.lora import AcousticLoRA
+    from yue2.artist_lora import read_adapter
     if not isinstance(path, str) or not path.strip():
         raise ValueError('Enter a local YuE2 LoRA file path.')
     try:
-        adapter = AcousticLoRA.read(path)
+        adapter = read_adapter(path)
     except SafetensorError as exc:
         raise ValueError('Invalid safetensors adapter: '+str(exc)) from exc
     return {**adapter.info(1.0), 'training_style':training_style(adapter.metadata)}
@@ -68,6 +68,22 @@ def catalogue():
                           'trigger_word':metadata.get('trigger_word',''),'training_style':training_style(metadata)})
         except (OSError, ValueError, RuntimeError, SafetensorError) as exc:
             rejected.append({'name':path.name, 'error':str(exc)})
+    # Completed Artist runs remain in their original artifact folders alongside
+    # their manifest. Do not copy them into the acoustic-only adapter folder.
+    import json
+    for job_path in sorted((ROOT/'runs/studio').glob('*/job.json')):
+        try:
+            job=json.loads(job_path.read_text(encoding='utf-8'))
+            if job.get('kind')!='artist_training' or job.get('status')!='complete':continue
+            path=job_path.parent/'result/final.safetensors'
+            with safe_open(str(path),framework='pt') as handle:
+                metadata=handle.metadata() or {}
+                if metadata.get('format')!='yue2-artist-ar-v1':raise ValueError('Invalid Artist adapter format.')
+            if not (path.parent/'manifest.json').is_file():raise ValueError('Artist companion manifest missing.')
+            items.append({'path':str(path.resolve()),'name':job['title']+' · '+metadata.get('step','?')+' steps',
+                          'kind':'artist','trigger_word':metadata.get('trigger_word',''),'training_style':training_style(metadata)})
+        except (OSError,ValueError,KeyError,RuntimeError,SafetensorError) as exc:
+            rejected.append({'name':job_path.parent.name,'error':str(exc)})
     return {'folder':str(folder), 'loras':items, 'rejected':rejected}
 
 
@@ -82,8 +98,17 @@ def prepare(settings, request, expected=None):
     info = inspect_adapter(selection['path'])
     if expected and expected.get('sha256') != info['sha256']:
         raise ValueError('The LoRA file changed since this run was saved. Select it again for a new song.')
+    if info.get('kind')=='artist':
+        runtime=settings['runtime']
+        if runtime['backend'] not in ('torch','torch-eager') or runtime['quantization']!='none' or runtime['offload_ar']:
+            raise ValueError('Artist LoRA requires Torch, quantization None, and AR offloading disabled.')
+        if request.get('cot','full')!='off' or request.get('abc'):
+            raise ValueError('Artist LoRA requires No score generation mode and no ABC score. Your settings were not changed.')
+        if expected and any(expected.get(key)!=info.get(key) for key in ('companion_sha256','base_identity')):
+            raise ValueError('Artist companion or base-model identity changed since queueing.')
     selection['path'] = info['path']
     info['strength'] = selection['strength']
+    if info.get('kind')=='artist':info['companion_strength']=1. if selection['strength']!=0 else 0.
     trigger = info['trigger_word'].strip()
     if not isinstance(request.get('style',''), str):
         raise ValueError('Style must be text.')

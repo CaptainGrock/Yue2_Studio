@@ -10,7 +10,7 @@ function syncLoras(){
   for(const [path,item] of localLoras)items.set(path,item);
   if(current&&!items.has(current))items.set(current,{path:current,name:loraName(current)});
   const select=$('loraSelect');select.replaceChildren(new Option('None · original YuE2',''));
-  for(const item of items.values())select.add(new Option((item.name||loraName(item.path)),item.path));
+  for(const item of items.values())select.add(new Option((item.kind==='artist'?'Artist · ':'Style · ')+(item.name||loraName(item.path)),item.path));
   select.value=current;select.disabled=false;
   if($('surpriseLoraSelect')){
     const surprise=$('surpriseLoraSelect');surprise.replaceChildren(...Array.from(select.options,option=>new Option(option.text,option.value)));
@@ -21,12 +21,13 @@ function syncLoras(){
   $('loraAutoTrigger').checked=selection.auto_trigger;
   const item=items.get(current);
   if($('surpriseTrainingStyleStatus'))$('surpriseTrainingStyleStatus').textContent=current?(item?.training_style?.trim()?'Training style saved in this LoRA. Selecting it fills both song-creation style boxes; you can edit either.':'No training style saved / not yet inspected. Your style descriptions are unchanged.'):'Selecting a LoRA can fill both song-creation style boxes from its saved training style.';
-  if($('loraStrengthHelp'))$('loraStrengthHelp').textContent='0 applies no effect. Lower strengths give a subtler influence; 1 is the starting point. Above 1 can introduce distortion or reduce coherence. Style adapters affect acoustic rendering, not the composer.';
+  const artist=item?.kind==='artist';
+  if($('loraStrengthHelp'))$('loraStrengthHelp').textContent=artist?'Artist strength controls the song-generation adapter. 1 is the starting point; higher values may reduce coherence. While enabled, the required community acoustic companion stays at full strength. 0 disables both. This is not the same as an AR-only comparison with the companion kept on.':'0 applies no effect. Lower strengths give a subtler influence; 1 is the starting point. Above 1 can introduce distortion or reduce coherence. Style adapters affect acoustic rendering, not the composer.';
   $('loraTrigger').textContent=item?.trigger_word||'No phrase recorded / not yet inspected';
   const gguf=state.settings.runtime.backend==='audio.cpp';
   $('loraStrength').disabled=gguf;$('loraAutoTrigger').disabled=gguf;
-  $('loraStatus').textContent=gguf?(current?'This selection requires Torch. Choose None to render with GGUF.':'Style LoRAs require the Torch engine.'):
-    loraListError||(current?'Selected for future songs. Active renders keep their saved settings.':items.size?'Choose a Style adapter, or keep the original model.':'No YuE2 LoRAs found yet.');
+  $('loraStatus').textContent=gguf?(current?'This selection requires Torch. Choose None to render with GGUF.':'LoRAs require the Torch engine.'):
+    loraListError||(artist?'Artist LoRA + companion selected. Requires No score mode, Torch, quantization None, and AR offloading disabled. Keep your shared style in the style box; the trigger can be added automatically.':current?'Selected for future songs. Active renders keep their saved settings.':items.size?'Choose a Style or Artist adapter, or keep the original model.':'No YuE2 LoRAs found yet.');
   if($('surpriseLoraStatus'))$('surpriseLoraStatus').textContent=(current?'Strength '+Number(selection.strength).toFixed(2)+' · Automatic trigger '+(selection.auto_trigger?'on':'off')+'. ':'')+$('loraStatus').textContent;
   $('loraFolder').textContent=loraFolder?'Place YuE2 .safetensors files in '+loraFolder+' and refresh the list.':'Default folder: models/loras inside your YuE2 installation.';
 }

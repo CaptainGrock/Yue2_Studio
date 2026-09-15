@@ -1,6 +1,11 @@
 __pycache__/
 *.pyc
 .venv/
+.venv-artist/
+.artist-runtimes/
+training/
+datasets/
+hf_modules_artist/
 models/
 runs/
 hf-cache/
