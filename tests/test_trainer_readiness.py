@@ -46,6 +46,7 @@ def test_readiness_never_initializes_cuda_or_downloads(tmp_path,monkeypatch):
 
 
 def test_download_is_pinned_verified_and_only_publishes_on_success(tmp_path,monkeypatch):
+    import huggingface_hub
     from yue2 import storage
     monkeypatch.setattr(setup,'ROOT',tmp_path)
     paths={key:model_folder(tmp_path,key) for key in setup.MODELS}
@@ -54,10 +55,14 @@ def test_download_is_pinned_verified_and_only_publishes_on_success(tmp_path,monk
         key=next(k for k,v in setup.MODELS.items() if v['repo']==repo)
         assert kwargs['revision']==setup.MODELS[key]['revision']
         assert kwargs['token'] is False
-        assert str(tmp_path/'models/style-trainer-cache')==kwargs['cache_dir']
+        assert str(tmp_path/'models/style-trainer-cache'/key/setup.MODELS[key]['revision'])==kwargs['local_dir']
+        assert 'cache_dir' not in kwargs
+        assert 'model.safetensors' in kwargs['allow_patterns']
+        assert 'LICENSE' in kwargs['allow_patterns']
+        assert '*.py' not in kwargs['allow_patterns']
         calls.append(key)
         return Path(paths[key])
-    monkeypatch.setattr(storage,'resolve_model',resolve)
+    monkeypatch.setattr(huggingface_hub,'snapshot_download',resolve)
     verified=[]
     monkeypatch.setattr(storage,'model_identity',lambda path,verify:verified.append((str(path),verify)))
     run=tmp_path/'run';run.mkdir()

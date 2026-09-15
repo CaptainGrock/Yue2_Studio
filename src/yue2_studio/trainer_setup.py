@@ -109,12 +109,19 @@ def readiness(payload):
 
 
 def download_models(directory):
-    from yue2.storage import resolve_model, model_identity
+    from huggingface_hub import snapshot_download
+    from yue2.storage import MODEL_FILES, MODEL_LICENSES, model_identity
     from .jobs import write_json
     paths = {}
     for key, info in MODELS.items():
         print(f'[YuE2] Starting Download {key}: {info["repo"]} at {info["revision"]}',flush=True)
-        path = resolve_model(info['repo'],revision=info['revision'],token=False,cache_dir=str(ROOT/'models/style-trainer-cache'))
+        # local_dir downloads ordinary files directly. The shared HF cache can
+        # attempt symlinks on Windows drives that do not support them, even
+        # after its initial capability probe. Do not require admin privileges.
+        path = Path(snapshot_download(info['repo'],revision=info['revision'],token=False,
+            local_dir=str(ROOT/'models/style-trainer-cache'/key/info['revision']),
+            allow_patterns=sorted(MODEL_FILES)+['model-?????-of-?????.safetensors']+
+                           ['licenses/'+name for name in sorted(MODEL_LICENSES)]))
         validate_model_folder(str(path),key)
         model_identity(path,True)  # Verify released weight hashes before publication.
         paths[key] = str(path)

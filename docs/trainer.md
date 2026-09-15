@@ -91,7 +91,8 @@ If full weights are missing, **Download training models** queues an explicit,
 CPU-only download of pinned official YuE2-3B and YuE2-Vae snapshots. Approximately
 7.8 GB of weights plus small support files are needed; allow additional space for
 cache files, audio latents and checkpoints. Downloads use a separate
-`models/style-trainer-cache` folder, verify the released weight hashes, and never
+`models/style-trainer-cache` folder using ordinary files (no symbolic-link or
+Windows administrator requirement), verify the released weight hashes, and never
 execute downloaded Python code. No credentials are sent. Cancel stops the download
 worker; Hugging Face may retain partial files for retry. No training starts on
 completion. Check setup again, click **Use downloaded model paths**, then check
