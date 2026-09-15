@@ -39,6 +39,25 @@ async function toggleStar(id){
   finally{pendingStars.delete(id);}
 }
 
+const pendingRenames=new Set();
+async function renameSong(id){
+  const job=state.jobs.find(item=>item.id===id);
+  if(!job||pendingRenames.has(id))return;
+  const entered=window.prompt('Edit song name (1–180 characters):',job.title);
+  if(entered===null)return;
+  const title=entered.trim();
+  if(!title||Array.from(title).length>180){feedbackError(new Error('Song name must contain 1 to 180 characters.'));return;}
+  if(title===job.title)return;
+  pendingRenames.add(id);
+  try{
+    const updated=await api('/api/jobs/'+id+'/rename',{title});
+    const current=state.jobs.find(item=>item.id===id);
+    if(current)current.title=updated.title;
+    renderLibrary();toast('Song name updated.');
+  }catch(error){feedbackError(error);}
+  finally{pendingRenames.delete(id);}
+}
+
 function bindLibraryDates(){
   $('libraryDate').oninput=renderLibrary;
   $('libraryDateFilter').onchange=()=>{

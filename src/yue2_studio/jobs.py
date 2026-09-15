@@ -236,6 +236,18 @@ class JobManager:
             job['starred'] = starred
             return deepcopy(job)
 
+    def rename(self,job_id,title):
+        """Change the library label without rewriting render inputs or artifacts."""
+        if not isinstance(title,str) or not title.strip() or len(title.strip())>180:
+            raise ValueError('Song name must contain 1 to 180 characters.')
+        title = title.strip()
+        with self.lock:
+            self.directory(job_id)
+            job = self.jobs[job_id]
+            self._persist({**job,'title':title})
+            job['title'] = title
+            return deepcopy(job)
+
     def delete(self,job_id):
         with self.lock:
             directory = self.directory(job_id)

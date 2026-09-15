@@ -46,6 +46,8 @@
 .star-button:hover,.star-button:focus-visible{border-color:var(--accent);color:var(--accent)}
 .star-button.starred{color:var(--accent)}
 .star-button.starred svg{fill:currentColor}
+.rename-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;width:28px;height:28px;padding:5px;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--muted);cursor:pointer}
+.rename-button:hover,.rename-button:focus-visible{color:var(--accent);border-color:var(--accent)}
 @media(max-width:680px){
 .library-toolbar input:not([type=date]){flex:1 1 100%;max-width:none}
 .library-toolbar select{flex:1 1 140px}

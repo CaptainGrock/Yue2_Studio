@@ -225,6 +225,10 @@ class Handler(BaseHTTPRequestHandler):
                 if set(data) != {'starred'}:
                     raise ValueError('Expected only the starred field.')
                 self.json(self.server.jobs.set_starred(path.split('/')[3],data['starred']))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/rename',path):
+                if set(data) != {'title'}:
+                    raise ValueError('Expected only the title field.')
+                self.json(self.server.jobs.rename(path.split('/')[3],data['title']))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/delete',path):
                 self.json(self.server.jobs.delete(path.split('/')[3]))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/retry',path):

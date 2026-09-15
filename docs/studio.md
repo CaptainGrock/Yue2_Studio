@@ -65,6 +65,8 @@ The screenshot shows Custom because the memory controls were adjusted manually.
 In the library, click the star beside a title to save a favorite, then choose
 **Starred only** to find it again. Stars are stored with the run and survive a
 Studio restart; starring a run does not change its generation settings or interrupt it.
+Click the pencil beside a title to rename it (1–180 characters). This updates the
+saved library label, not the original render inputs, audio tags, or artifact filenames.
 Combine search and the existing run filters with **Created today**, **Created yesterday**,
 **Last 7 days**, **Last 30 days**, or **Choose a date…**. Dates use your browser's
 local calendar and the run's creation time, not its completion time. The last-7/30-day

@@ -54,6 +54,30 @@ class LibraryTests(unittest.TestCase):
                     manager.set_starred(key, True)
             self.assertFalse(manager.jobs[key]['starred'])
 
+    def test_rename_is_durable_and_does_not_touch_render_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = JobManager(tmp, start=False)
+            key = manager.generate(payload())['id']
+            directory = manager.directory(key)
+            before = (directory/'input.json').read_bytes()
+            manager.jobs[key]['status'] = 'running'
+            manager.set_starred(key, True)
+            renamed = manager.rename(key, '  New song 🎵  ')
+            self.assertEqual(renamed['title'], 'New song 🎵')
+            self.assertEqual(renamed['status'], 'running')
+            self.assertTrue(renamed['starred'])
+            self.assertEqual((directory/'input.json').read_bytes(), before)
+            self.assertEqual(JobManager(tmp, start=False).jobs[key]['title'], 'New song 🎵')
+            for title in ('', '   ', 'x'*181, None, 123, True, []):
+                with self.subTest(title=title), self.assertRaises(ValueError):
+                    manager.rename(key, title)
+            with patch.object(manager, '_persist', side_effect=OSError('disk full')):
+                with self.assertRaises(OSError):
+                    manager.rename(key, 'Not saved')
+            self.assertEqual(manager.jobs[key]['title'], 'New song 🎵')
+            with self.assertRaises(ValueError):
+                manager.rename('0'*32, 'Unknown')
+
     def test_http_contract(self):
         with tempfile.TemporaryDirectory() as tmp:
             manager = JobManager(tmp, start=False)
@@ -62,11 +86,11 @@ class LibraryTests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                def post(data, token=True, job_id=key):
+                def post(data, token=True, job_id=key, action='star'):
                     headers = {'Content-Type': 'application/json'}
                     if token:
                         headers['X-Studio-Token'] = server.token
-                    request = Request(f'http://127.0.0.1:{server.server_port}/api/jobs/{job_id}/star',
+                    request = Request(f'http://127.0.0.1:{server.server_port}/api/jobs/{job_id}/{action}',
                                       data=json.dumps(data).encode(), headers=headers)
                     try:
                         response = urlopen(request)
@@ -82,6 +106,13 @@ class LibraryTests(unittest.TestCase):
                 for data in ({}, {'starred': 1}, {'starred': True, 'title': 'Unwanted edit'}):
                     self.assertEqual(post(data)[0], 400)
                 self.assertEqual(post({'starred': True}, job_id='0'*32)[0], 400)
+                status, result = post({'title': 'New title'}, action='rename')
+                self.assertEqual(status, 200)
+                self.assertEqual(result['title'], 'New title')
+                self.assertEqual(post({'title': 'Name'}, token=False, action='rename')[0], 403)
+                for data in ({}, {'title': ''}, {'title': 1}, {'title': 'x'*181}, {'title': 'Name', 'starred': True}):
+                    self.assertEqual(post(data, action='rename')[0], 400)
+                self.assertEqual(post({'title': 'Name'}, job_id='0'*32, action='rename')[0], 400)
             finally:
                 server.shutdown()
                 server.server_close()
