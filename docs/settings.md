@@ -8,8 +8,13 @@ Defaults favor the fast validated execution path. Speed, memory, output length a
 
 ## Everyday controls
 
+**Artist LoRA exception:** playback requires No score, Torch/Torch-eager,
+quantization None and AR offloading disabled. Memory presets can change offloading;
+recheck it before rendering. These generation settings do not tune Artist training.
+See [Artist controls](artist-trainer.md#training-controls-and-progress).
+
 - **Full / melody / off:** full plans harmony and melody, melody plans lead melody, off skips score planning. Off avoids planner time but changes conditioning.
-- **Seed:** reuse for reproducibility within the same environment/settings. Different attention kernels may produce different sampled songs.
+- **Seed:** records a sampling condition, not an exact replay guarantee. Tested No score/Torch runs varied even with identical seed, style, lyrics and settings and no LoRA. The exact cause is unconfirmed. Preserve original audio and compare multiple pairs; see [comparison guidance](studio.md#seeds-and-comparing-results).
 - **Style:** language, genre, vocal delivery, instruments, groove and BPM. Use lyrics for words and section tags.
 - **LLM runner:** provider/model discovery, endpoint and API key; maximum output tokens caps the writing response, timeout controls waiting, temperature controls text variation, local context controls local LLM memory. These do not change Yue2 sampling.
 - **Surprise me:** 1–50 songs, vocal gender, style, language. Require strong profanity checks at least 3 uncensored strong English swear-word occurrences in sung lines before rendering. A failed draft/render stops the remainder.

@@ -59,7 +59,8 @@ conditioning and AR adapters with a pinned community acoustic companion. Follow
 terms. Playback requires No score, Torch, no quantization and AR offloading off;
 GGUF and arbitrary adapter stacking are unsupported. The installer also accepts
 the known merged Style Trainer pipeline, with backups, but rejects unfamiliar
-Artist adapter code. Fresh dependency/download and GPU tests remain release gates.
+Artist adapter code. Fresh isolated setup, alignment, short GPU training and playback
+tests passed on an RTX 5090; see the documented [verification limits](docs/artist-setup.md#validation-status).
 
 The installer modifies `src/yue2/cuda_graph.py` to detect builds without compiled
 Flash Attention, keeping fast CUDA graphs through cuDNN/SDPA. It also installs the
@@ -93,8 +94,12 @@ are needed. Paths are resolved locally; this repository includes no weights.
 - **New song:** enter style and section-tagged lyrics, then create music.
 - **Style trainer:** check setup, select local songs and a shared style, save the
   setup, then explicitly queue training. Successful adapters appear in the creation
-  area's Style LoRA list. Full PyTorch weights and a BF16 NVIDIA GPU are required;
+  area's Style / Artist LoRA list. Full PyTorch weights and a BF16 NVIDIA GPU are required;
   LoRAs do not work with GGUF. Missing weights can be downloaded through the trainer.
+- **Artist trainer:** prepare its separate runtime/model paths, review matching
+  full-song lyric files, save a setup and explicitly queue training. Defaults are
+  500 steps and save every 250. Playback loads your Artist adapter and its pinned
+  companion together. [Walkthrough](docs/artist-trainer.md).
 - **Writing room:** choose an LLM provider, refresh its model list, enter your own
   API key or local endpoint, and generate/edit lyrics and styles.
 - **Surprise me:** choose batch size, vocal gender, style, language and optional
@@ -150,8 +155,15 @@ tradeoff; fewer synthesis steps and shorter token limits change the result, so t
 are documented options rather than hidden speed tricks. Existing saved drafts
 retain their settings; use Restore defaults in Advanced settings to adopt new defaults.
 
-For memory failures, enable **Offload autoregressive model**, then generate again.
-This trades weight-transfer time for lower synthesis memory use. Keep `torch` enabled.
+For ordinary generation memory failures, **Offload autoregressive model** trades
+weight-transfer time for lower synthesis memory use. Keep `torch` enabled.
+**Artist LoRAs require AR offloading disabled**; free competing GPU workloads and
+check the supported settings instead of enabling that option for an Artist bundle.
+
+**Same seed does not guarantee the same song.** No score/Torch baseline-only tests
+varied with identical seed, style, lyrics and settings. The exact cause is not yet
+established. Retain original outputs and compare multiple baseline/LoRA pairs;
+see [comparison guidance](docs/studio.md#seeds-and-comparing-results).
 
 ## Updates and shutdown
 
@@ -172,6 +184,7 @@ Your runs stay under the parent `runs/studio/`; keys are entered per browser ses
 
 - [Full workflow guide](docs/studio.md)
 - [Every advanced setting, defaults, performance and troubleshooting](docs/settings.md)
+- [Style Trainer](docs/trainer.md) · [Artist Trainer](docs/artist-trainer.md) · [LoRA playback](docs/lora.md)
 - [Official YuE2 music skill and formatting](https://github.com/multimodal-art-projection/YuE/tree/main/skills/yue2-music)
 
 ## License and credits
@@ -186,6 +199,9 @@ This repository contains no songs, uploads, API keys, caches or Python environme
 The server is local-only; cloning gives each user their own studio, not access to yours.
 
 ## See the Studio
+
+Some images show earlier layouts. Updated trainer, LoRA and library screenshots
+are pending; the written guide describes the current controls.
 
 | Create a song | Create a cover |
 | --- | --- |

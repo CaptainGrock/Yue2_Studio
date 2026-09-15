@@ -1,10 +1,21 @@
-# Experimental acoustic LoRA engine
+# Experimental Style and Artist LoRA playback
 
-The Python pipeline supports one acoustic adapter at a time. No adapter is
-selected by default. The creation page now has a Style LoRA selector, a 0–2
+The Python pipeline supports one Style adapter or Artist bundle at a time. No adapter is
+selected by default. The creation page has a Style / Artist LoRA selector, a 0–2
 strength slider with a clickable explanation, and an automatic trigger option.
 Place YuE2 adapters in `models/loras` and choose Refresh list, or use the local
-file path control to select an adapter elsewhere. Use **Style trainer** to create an adapter from your own songs.
+file path control to select an adapter elsewhere. Use **Style trainer** for acoustic
+training or **Artist trainer** for full-song audio/lyric training. Completed Artist
+bundles are discovered in their run folders; keep those folders available.
+
+Artist bundles use `yue2-artist-ar-v1` safetensors plus a sibling manifest and pinned
+community NAR companion. Playback requires No score, Torch/Torch-eager, quantization
+None and AR offloading off. At nonzero Artist strength the companion stays at full
+strength; zero disables both. There is no arbitrary Style + Artist stacking.
+See the [Artist walkthrough](artist-trainer.md) for the companion's role and portability.
+
+The acoustic-format internals and Python example below describe **Style adapters**.
+Artist adapters also affect semantic generation and have additional identity checks.
 
 Drafts, exported projects, and saved run settings retain the selection. Each
 queued song records the adapter SHA-256 and strength. The worker checks that
@@ -24,7 +35,7 @@ with YuE2Pipeline.from_pretrained(model_path, vae=vae_path) as pipe:
     original = pipe(style="soul", lyrics=lyrics)
 ```
 
-Supported files are compatible `comfyui-native-lora` safetensors
+Supported Style files are compatible `comfyui-native-lora` safetensors
 exports and the Studio trainer's `yue2-lora-v1` acoustic format. Native fused QKV and gate/up
 matrices are split by the loaded model's actual dimensions; per-module alpha is
 honored. Only NAR attention/MLP and audio/time projections are accepted. Unknown,
@@ -55,11 +66,12 @@ not a merged LoRA; keep adapter files separately.
 
 CPU tests exercise native fused mapping, actual acoustic synthesis, scaling,
 bit-exact BF16 restoration, malformed input, failure rollback, and busy-state
-protection. GPU/audio quality testing with a trained adapter remains a separate
-validation step.
-# Surprise me
+protection. Musical quality remains a separate listening judgment. Artist GPU
+technical test scope is recorded in [Artist setup](artist-setup.md).
 
-New Style Trainer checkpoints and final adapters embed the shared training style
+## Surprise me
+
+New Style and Artist Trainer checkpoints and final adapters embed the shared training style
 in safetensors metadata. Selecting an adapter offers that style in both the main
 Style box and Surprise me Style direction. Empty boxes fill automatically;
 replacing existing descriptions requires confirmation. Both remain editable,
@@ -82,3 +94,12 @@ creation-area selection, strength, and automatic-trigger setting; every song in
 a new batch uses that saved selection. Choose None for the original model.
 Queued/running jobs retain their saved settings. Torch is required; selecting a
 LoRA does not switch away from GGUF automatically.
+
+## Comparing results
+
+Keep inputs/settings fixed, but do not assume a seed guarantees an identical song.
+No score/Torch baseline-only repeats varied before loading any LoRA; the exact
+cause remains unconfirmed. An audible difference can include ordinary generation
+variation. Compare multiple pairs and retain originals. Exact weight restoration
+after unloading does not imply identical newly sampled audio.
+See [seeds and comparing results](studio.md#seeds-and-comparing-results).

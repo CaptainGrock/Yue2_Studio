@@ -1,7 +1,16 @@
 # YuE2 Studio · Beta
 
 A local HTML/CSS/JavaScript music studio backed by the installed Python engines. No Gradio,
-Node build, CDN, or additional runtime Python packages are needed.
+Node build or CDN is needed. Normal Studio uses the existing YuE2 environment;
+Artist Trainer requires its own explicitly installed runtime.
+
+This guide covers the current controls. Some screenshots show earlier layouts;
+replacement screenshots for the trainers, LoRA controls and library are pending.
+Follow the text when a screenshot differs.
+
+Quick links: [trainers](#train-your-own-lora), [LoRA playback](#use-a-lora),
+[seed and comparison limits](#seeds-and-comparing-results),
+[all engine settings](settings.md).
 
 ## Launch
 
@@ -79,6 +88,9 @@ instead of calling a capped result a complete musical performance. All default s
 
 ## Surprise me and automatic batches
 
+For LoRA selection, training-style autofill and the style lock, see
+[Use a LoRA](#use-a-lora). Artist bundles require No score here as well.
+
 ![Surprise me controls for song count, vocal gender, style, profanity and language](../images/surprise-me.png)
 
 *Choose how many songs to create and the constraints each song should follow. The screenshot shows three female-led punk rock songs with required profanity.*
@@ -101,6 +113,9 @@ marked “Review ending” in the library. API credentials are held only in serv
 never in the saved batch or song files. Restarted batches are marked interrupted and are not auto-resumed.
 
 ## Covers
+
+Artist LoRAs currently require No score and cannot be used for supplied-ABC covers.
+Style LoRAs do not have that Artist-specific mode restriction.
 
 ![Cover editor with source audio upload and melody transcription controls](../images/create-cover.png)
 
@@ -127,7 +142,7 @@ lyric recognition, or provide exact acoustic note alignment. Review transcriptio
 *Select your provider and model, enter your own API key, and test the connection. Model availability depends on the selected provider and your account.*
 
 Open **LLM Runner**, choose a provider, enter your API key, and **Refresh models**. The studio includes
-the text-model starter lists inspected in your video builder's `LLM.py`; these are clearly labeled
+text-model starter lists; these are clearly labeled
 starter choices, not a promise of account availability. Live discovery refreshes the dropdown. You can
 always enter an exact custom model ID.
 
@@ -180,7 +195,112 @@ Edit the title, style and lyrics before applying. **Apply draft** uses the whole
 
 ## Experimental audio.cpp / GGUF
 
-For the alternative lower-VRAM runtime, follow the [GGUF setup guide](gguf.md). Select audio.cpp in the inference backend control and configure its own model components. Normal songs, covers with supplied ABC, and Surprise me use the same workflows above. Torch-only runtime settings do not control the C++ process. Plan-only and generated ABC export remain torch features.
+For the alternative lower-VRAM runtime, follow the [GGUF setup guide](gguf.md). Select audio.cpp in the inference backend control and configure its own model components. Normal songs, covers with supplied ABC, and Surprise me use the same workflows above. Torch-only runtime settings do not control the C++ process. Plan-only and generated ABC export remain torch features. Neither trainer trains GGUF weights, and neither LoRA type plays through GGUF.
+
+## Train your own LoRA
+
+**Style trainer** and **Artist trainer** are separate entries in the left sidebar,
+with Artist below Style. Both are experimental; neither promises a cloned singer.
+
+| | Style trainer | Artist trainer |
+| --- | --- | --- |
+| Input | Songs and one shared style; no lyric sidecars | At least two complete 30–360 second songs with matching full lyrics, plus shared style and trigger |
+| Training approach | Acoustic/NAR adapter, shuffled audio clips | AR adapter, full-song semantic sequences, optional English lyric alignment |
+| Starting defaults | 2,000 steps; save every 500 | 500 steps; save every 250 |
+| Extra setup | Full PyTorch YuE2 + VAE | Separate runtime, full models, MERT, community encoder/companion and reference pack |
+| Playback | Python engine; not GGUF | No score, Torch/Torch-eager, quantization None, AR offloading off |
+
+Use recordings you have permission to train on. A consistent singer and musical
+direction makes an Artist experiment easier to interpret, but does not guarantee
+singer identity. A mixed collection may teach mixed traits.
+
+For Style training, check/download the full model and VAE, choose a song folder,
+enter a shared style and trigger, scan, exclude unwanted files and save the setup.
+Clip length means consecutive chunks across each song, not only its opening:
+three minutes yields 18 ten-second clips; shorter leftover tails are excluded.
+It does not set the duration of generated music. [Complete Style instructions](trainer.md).
+
+For Artist training, follow the [Artist walkthrough](artist-trainer.md): check
+model paths, explicitly prepare missing models and install the separate runtime,
+then recheck setup. Select the lyric filename convention, scan the folder, review
+the full lyrics against each selected song, enter shared style/trigger and save.
+The last selected song is held out for validation. Choose training controls and
+explicitly queue training; the saved dataset/style snapshot is used, not unsaved edits.
+
+Training shares Studio's serial queue with rendering and transcription. Setup
+checks do not allocate GPU memory, but actual preparation/training does. Separate
+Studio instances, games and local LLMs are not coordinated by this queue.
+Open **Song library → Open run** for stage progress, loss, logs and checkpoints.
+Preparation can take time before the first training step. A decreasing loss or
+short smoke-test success is not a quality verdict.
+
+Checkpoints retain adapter weights, not exact optimizer/RNG resume state. Keep
+earlier checkpoints when comparing training lengths; starting another run is not
+an exact continuation. Cancellation waits for a safe boundary where supported;
+force-closing can lose unsaved work. [Artist setup and test limits](artist-setup.md).
+
+## Use a LoRA
+
+Choose **Style / Artist LoRA** in Create music or Surprise me, then **Refresh list**
+if a new adapter is missing. A local-path control also accepts compatible files.
+No adapter is selected by default. Only one Style adapter or Artist bundle can
+be selected at a time; manually stacking Style and Artist LoRAs is not supported.
+
+New adapters carry their shared training style in metadata. Selecting one fills
+empty main/Surprise style boxes and asks before replacing existing descriptions.
+You can edit those descriptions afterward. Older files without usable style
+metadata leave the boxes unchanged. Automatic trigger insertion adds the saved
+trigger when needed; it is not a guarantee of a particular voice.
+
+In Surprise me, **Keep this style unchanged** defaults on when a LoRA is selected.
+The LLM can write new titles/lyrics while the renderer keeps your Style direction,
+apart from automatic trigger insertion. Enter a nonempty style. The lock takes
+precedence over vocal-gender style wording; Instrumental still removes sung lyrics.
+Uncheck the lock only if you want to experiment with changing styles. Normal
+Surprise batches use new seeds and new text, so they are not fixed-input comparisons.
+
+An Artist selection automatically loads your trained AR adapter plus its pinned
+community **companion LoRA**, which adapts the acoustic decoder to the encoder's
+real-audio token representation. The companion is not your singer LoRA and is not
+a second user-selected adapter. It stays at full strength whenever Artist strength
+is nonzero; strength zero disables both. Style training does not use this companion.
+
+Artist playback needs No score, Torch/Torch-eager, quantization None and AR
+offloading disabled. Selecting a LoRA does not silently fix incompatible settings.
+GPU presets may change offloading, so recheck that control before Artist playback.
+Choose **None** for the unmodified model. Queued songs keep their original selection.
+See [file formats and portability](lora.md) before moving adapters between PCs.
+
+## Seeds and comparing results
+
+**The same seed does not guarantee the same song.** In the tested No score/Torch
+configuration, repeated runs with the same seed, style, lyrics and settings
+produced different music tokens even with LoRA set to None. The user also observed
+audible differences. The exact cause has not been established; this is not proof
+that all backends or modes behave identically. A fixed seed is still useful for
+recording the conditions of an experiment, but is not an exact replay promise.
+
+For a listening comparison:
+
+1. Save the original output and its request/settings. Use identical style (including
+   trigger), lyrics, seed, model/VAE and engine settings for each comparison pair.
+2. Render more than one baseline with **None** to hear ordinary run-to-run variation.
+3. Select the LoRA and render with those same inputs. Avoid Surprise me and LLM
+   rewrites during the comparison; they change the conditions.
+4. Compare several pairs, not just one. A small difference is not by itself evidence
+   that the LoRA learned your singer or style. More steps are not automatically better.
+
+In score modes, reusing the same saved ABC controls the composition more closely
+than generating a new score each time, but does not promise identical audio.
+Artist playback currently requires No score. Developer tests can reuse exact
+semantic tokens to isolate acoustic changes; that does not test an Artist LoRA's
+semantic-generation effect and is not a normal UI comparison option.
+
+Exact weight restoration and identical songs are different checks. The release
+test verified unchanged parameter hashes after unloading the Artist bundle and
+after interruption, plus exact fixed-token synthesis restoration. It did **not**
+establish bit-identical repeated sampled songs. Keep generated files for exact
+playback of a result; rerendering or Retry saved song can produce a different one.
 
 ## Settings and storage
 
@@ -208,8 +328,9 @@ inconsistent token limits, invalid overlap, and incompatible score/mode combinat
   latent arrays, hashes, timing and model identity. Plan-only runs also retain model/config provenance.
 - **Recordings:** local upload copies live under `runs/studio/uploads`. Project JSON retains their local
   IDs and names, not the recording bytes. Re-upload when transferring to another machine.
-- **Queue:** one GPU worker at a time, shared by songs and transcriptions. Cancelling terminates only
-  that job's worker. Interrupted jobs are marked on restart and are not silently resumed.
+- **Queue:** one GPU worker at a time, shared by songs, transcriptions and training.
+  Training cancellation can wait for a safe boundary; other workers use process
+  cancellation. Interrupted jobs are marked on restart and are not silently resumed.
 - **Downloads:** native 24-bit FLAC and optional 24-bit WAV conversion. Artifact links include the
   exact request and all native result files. Audio supports byte-range seeking.
 
@@ -235,7 +356,7 @@ Screenshots and diagnostic runs live in ignored `runs/studio-qa` / `runs/studio`
 smoke renders check integration, not full-song quality. Paid provider authentication and musical
 quality must be assessed with your chosen account/model and actual song material.
 
-Provider adapters follow the inspected local video-builder interfaces and official references:
+Provider adapters use the following official interfaces:
 [OpenAI text generation](https://developers.openai.com/api/docs/guides/text),
 [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create),
 [Gemini content generation](https://ai.google.dev/api/generate-content),
