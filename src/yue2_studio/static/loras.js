@@ -5,13 +5,17 @@ function loraName(path){return path.split(/[\\/]/).pop().replace(/\.safetensors$
 function syncLoras(){
   if(!state.boot||!$('loraSelect'))return;
   const selection=state.settings.lora;
-  if(!selection){$('loraStatus').textContent='LoRA controls will be available after Studio restarts. Let current renders finish first.';$('loraSelect').disabled=true;$('useLocalLora').disabled=true;return;}
+  if(!selection){$('loraStatus').textContent='LoRA controls will be available after Studio restarts. Let current renders finish first.';$('loraSelect').disabled=true;$('useLocalLora').disabled=true;if($('surpriseLoraSelect')){$('surpriseLoraSelect').disabled=true;$('surpriseLoraStatus').textContent=$('loraStatus').textContent;}return;}
   const current=selection.path,items=new Map(loraCatalogue.map(item=>[item.path,item]));
   for(const [path,item] of localLoras)items.set(path,item);
   if(current&&!items.has(current))items.set(current,{path:current,name:loraName(current)});
   const select=$('loraSelect');select.replaceChildren(new Option('None · original YuE2',''));
   for(const item of items.values())select.add(new Option((item.name||loraName(item.path)),item.path));
   select.value=current;select.disabled=false;
+  if($('surpriseLoraSelect')){
+    const surprise=$('surpriseLoraSelect');surprise.replaceChildren(...Array.from(select.options,option=>new Option(option.text,option.value)));
+    surprise.value=current;surprise.disabled=false;
+  }
   $('loraOptions').hidden=!current;
   $('loraStrength').value=selection.strength;$('loraStrengthValue').textContent=Number(selection.strength).toFixed(2);
   $('loraAutoTrigger').checked=selection.auto_trigger;
@@ -22,6 +26,7 @@ function syncLoras(){
   $('loraStrength').disabled=gguf;$('loraAutoTrigger').disabled=gguf;
   $('loraStatus').textContent=gguf?(current?'This selection requires Torch. Choose None to render with GGUF.':'Style LoRAs require the Torch engine.'):
     loraListError||(current?'Selected for future songs. Active renders keep their saved settings.':items.size?'Choose a Style adapter, or keep the original model.':'No YuE2 LoRAs found yet.');
+  if($('surpriseLoraStatus'))$('surpriseLoraStatus').textContent=(current?'Strength '+Number(selection.strength).toFixed(2)+' · Automatic trigger '+(selection.auto_trigger?'on':'off')+'. ':'')+$('loraStatus').textContent;
   $('loraFolder').textContent=loraFolder?'Place YuE2 .safetensors files in '+loraFolder+' and refresh the list.':'Default folder: models/loras inside your YuE2 installation.';
 }
 async function inspectSelectedLora(path){
@@ -41,9 +46,10 @@ async function refreshLoras(){
 }
 function bindLoras(){
   $('refreshLoras').onclick=()=>busy('refreshLoras',refreshLoras);
-  $('loraSelect').onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$('loraSelect').value;loraListError='';syncLoras();save();if(state.settings.lora.path)inspectSelectedLora(state.settings.lora.path);};
-  $('loraStrength').oninput=()=>{state.settings.lora.strength=Number($('loraStrength').value);$('loraStrengthValue').textContent=Number($('loraStrength').value).toFixed(2);save();};
-  $('loraAutoTrigger').onchange=()=>{state.settings.lora.auto_trigger=$('loraAutoTrigger').checked;save();};
+  for(const id of ['loraSelect','surpriseLoraSelect'])if($(id))$(id).onchange=()=>{loraInspectEpoch++;state.settings.lora.path=$(id).value;loraListError='';syncLoras();save();if(state.settings.lora.path)inspectSelectedLora(state.settings.lora.path);};
+  if($('refreshSurpriseLoras'))$('refreshSurpriseLoras').onclick=()=>busy('refreshSurpriseLoras',refreshLoras);
+  $('loraStrength').oninput=()=>{state.settings.lora.strength=Number($('loraStrength').value);syncLoras();save();};
+  $('loraAutoTrigger').onchange=()=>{state.settings.lora.auto_trigger=$('loraAutoTrigger').checked;syncLoras();save();};
   $('useLocalLora').onclick=()=>busy('useLocalLora',async()=>{
     const path=$('loraLocalPath').value.trim().replace(/^"(.*)"$/,'$1');
     const info=await api('/api/loras/inspect',{path});

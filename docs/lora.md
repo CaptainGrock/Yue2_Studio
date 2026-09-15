@@ -57,3 +57,10 @@ CPU tests exercise native fused mapping, actual acoustic synthesis, scaling,
 bit-exact BF16 restoration, malformed input, failure rollback, and busy-state
 protection. GPU/audio quality testing with a trained adapter remains a separate
 validation step.
+# Surprise me
+
+The Surprise me panel has a LoRA dropdown and Refresh list action. It shares the
+creation-area selection, strength, and automatic-trigger setting; every song in
+a new batch uses that saved selection. Choose None for the original model.
+Queued/running jobs retain their saved settings. Torch is required; selecting a
+LoRA does not switch away from GGUF automatically.
