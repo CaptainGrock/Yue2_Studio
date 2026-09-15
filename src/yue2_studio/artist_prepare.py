@@ -119,6 +119,7 @@ def prepare(spec,directory,tokenizer,device):
         del mert,head,features,chunks;gc.collect();torch.cuda.empty_cache()
     print(f'[YuE2] Completed Artist encoding: {len(items)}/{len(items)} items',flush=True)
     if aligned and missing:
+        from scipy.signal import resample_poly
         import torchaudio
         from demucs.pretrained import get_model
         from demucs.apply import apply_model

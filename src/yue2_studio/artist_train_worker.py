@@ -117,7 +117,7 @@ def run(spec,directory):
         check_cancel(directory);save('final.safetensors',last_step)
         write_json(result/'training.json',dict(status='complete',steps=last_step,loss=last_loss,elapsed_seconds=time.monotonic()-start,
                    peak_allocated_gib=torch.cuda.max_memory_allocated()/2**30,
-                   adapter=str(result/'final.safetensors'),note='Actual AR artist LoRA. Requires the pinned NAR companion; creation-area support is the next step. No automatic comparison song.'))
+                   adapter=str(result/'final.safetensors'),note='Actual AR artist LoRA. Playback requires the pinned NAR companion, No score, Torch, no quantization and AR offloading disabled. No automatic comparison song.'))
         print(f'[YuE2] Completed Artist LoRA training: {steps}/{steps} steps',flush=True)
     except Cancelled:
         if last_step:save(f'stopped-{last_step:06d}.safetensors',last_step)

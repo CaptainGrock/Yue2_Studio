@@ -55,6 +55,14 @@ def test_sequences_never_clip():
     with pytest.raises(ValueError,match='Invalid'):ar.sequence(dict(item,codec=np.array([-1])),'cpu')
 
 
+def test_alignment_resampler_is_available():
+    import inspect
+    import symtable
+    from yue2_studio import artist_prepare
+    symbols=symtable.symtable(inspect.getsource(artist_prepare.prepare),'prepare','exec')
+    assert symbols.get_children()[0].lookup('resample_poly').is_imported()
+
+
 def test_word_offsets_and_cursor():
     from yue2.protocol import SongRequest,token_prefixes
     class CharTokenizer:

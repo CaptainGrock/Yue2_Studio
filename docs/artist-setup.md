@@ -3,8 +3,9 @@
 This is the setup layer for the upcoming Artist Trainer, not a finished release.
 The Artist panel, setup actions and training worker now use the new registry
 paths. Playback integration and installer support are implemented and tested on
-CPU in isolated installs. Real isolated runtime installation passed; visual and GPU tests
-remain release gates. This is not yet a fully validated Artist release.
+CPU in isolated installs. Real isolated setup and GPU smoke checks are documented
+below; final user review remains a release gate. These are technical checks, not
+a guarantee of singer similarity or compatibility with every GPU.
 
 ## Artist panel and queue
 
@@ -100,7 +101,7 @@ their SHA256 without executing them. The community scripts are not executed.
 
 CPU tests cover explicit confirmation, local reuse, pinned transfer requests,
 hash rejection, fresh runtime commands, and failure-safe registry publication.
-Those unit tests mock transfers and pip commands. The full suite passes 149 tests
+Those unit tests mock transfers and pip commands. The full suite passes 150 tests
 plus 28 subtests, alongside the Artist/Style/LoRA/Surprise UI-handler checks.
 Real isolated setup tests downloaded and hash-verified the pinned encoder,
 companion and reference pack, reusing verified base/VAE/MERT folders read-only.
@@ -112,7 +113,42 @@ nested pip build processes, without disabling TLS verification. The supporting
 packages, Demucs, dependency consistency check and CPU imports passed, followed
 by a successful complete fresh runtime installation with the corrected installer.
 The fresh runtime also imported the installed Artist preparation/training modules
-with CUDA uninitialized. Visual review and GPU training/alignment/playback remain
-separate release gates; passing CPU imports does not establish musical quality.
+with CUDA uninitialized. Passing CPU imports alone does not establish musical quality.
 The isolated Studio's real setup queue also completed `check`, with all files and
 imports ready and a saved result receipt. No training was started.
+
+### Real GPU preparation and training
+
+On an RTX 5090 (32 GB), a separate fresh-runtime test encoded two complete
+recordings (about 132 and 162 seconds), downloaded the first-use Demucs/MMS
+weights, separated vocals and aligned the lyrics. Word timings were finite,
+ordered and within each recording. Alignment confidence is not proof of a
+perfect lyric match. A missing alignment resampler import was fixed and covered
+by a regression test; the base Studio still does not need SciPy at module import.
+
+The queued rank-64 test completed two updates with alignment weight 0.08 and
+saved checkpoints after both updates plus the final adapter. Discovery returned
+the Artist bundle and its training style. Peak allocated VRAM was 7.25 GiB.
+A separate full-model backward pass on the longest reference (9,529 tokens,
+no clipping, rank 64) passed with finite gradients and 8.11 GiB peak allocated
+VRAM. These short tests do not establish long-run training quality or an ETA.
+
+### Playback and restoration
+
+Fixed-input No score/Torch playback generated baseline, Artist-bundle and
+unloaded-bundle audio with 32 synthesis steps. Each was deliberately limited to
+750 semantic tokens (30 seconds); the native receipts retain that truncation.
+The audio has not been auditioned as a quality or singer-similarity evaluation.
+
+An initial same-seed baseline/restored token-equality assertion failed. A separate
+control also differed between two baseline-only generations before loading any
+LoRA, so exact repeated audio is not claimed for this backend. The failed test
+and all audio were retained. Direct checks found all 627 model parameter hashes
+identical after adapter use and after an intentional exception inside the merge
+context. With the same semantic tokens, synthesis changed with the companion
+enabled and returned exactly to its baseline latents after unloading.
+An additional Artist render through the real Studio generation API/queue also
+completed, using the base Studio runtime, bundle identity guards and the same
+explicit 30-second cap. Original recording/lyric hashes were verified unchanged.
+The queue correctly marked that capped render `needs_review` for its token-limit
+warning; the native generation result completed and saved playable audio.
