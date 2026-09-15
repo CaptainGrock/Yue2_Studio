@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/loras.js" defer></script><script src="/trainer.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <svg class="icon-defs" aria-hidden="true"><defs>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -31,6 +31,7 @@
     </nav>
     <div class="sidebar-rule"></div>
     <div class="workspace-label">STUDIO TOOLS</div>
+    <button class="nav-item" data-view="trainer"><svg><use href="#i-sliders"/></svg>Style trainer</button>
     <button class="nav-item" id="runnerNav"><svg><use href="#i-spark"/></svg>LLM Runner</button>
     <button class="nav-item" id="advancedNav"><svg><use href="#i-sliders"/></svg>Engine settings</button>
     <button class="nav-item" id="modelsNav"><svg><use href="#i-download"/></svg>Music models</button>
@@ -47,6 +48,49 @@
   </aside>
   <div class="main-shell">
     <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <strong id="pageCrumb">Create music</strong></div><div class="top-actions"><span id="saveStatus" class="save-status">Local draft</span><button class="button quiet small" id="importProject"><svg><use href="#i-upload"/></svg>Open project</button><button class="button subtle small" id="exportProject"><svg><use href="#i-download"/></svg>Save project</button></div></header>
+    <main id="trainerView" hidden>
+      <section class="trainer-panel"><h2>Style Trainer setup</h2>
+        <p class="hint">Requires full PyTorch YuE2 + VAE weights and a BF16-capable NVIDIA GPU. GGUF weights cannot train or use these LoRAs. Select local model paths in Advanced settings, then check setup. No community encoder or lyric files are needed.</p>
+        <div class="row wrap"><button class="button subtle" id="trainerCheck">Check setup · no GPU allocation</button><button class="button subtle" id="trainerDownload">Download training models</button><button class="button subtle" id="trainerUseModels" disabled>Use downloaded model paths</button></div>
+        <p class="hint" id="trainerSetupStatus" role="status" style="white-space:pre-line">Check existing files first. Downloads and GPU training only start after separate explicit actions. After a download finishes, click Check setup, then Use downloaded model paths.</p>
+        <p class="hint">Model terms: <a href="https://huggingface.co/m-a-p/YuE2-3B/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">YuE2-3B license</a> · <a href="https://huggingface.co/m-a-p/YuE2-Vae/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">VAE license</a>. If FFmpeg is missing, use 48 kHz mono/stereo WAV or FLAC, or install FFmpeg on PATH for conversion.</p>
+      </section>
+      <section class="page-intro"><div><div class="eyebrow">EXPERIMENTAL STYLE TRAINING</div><h1>Build your sound.</h1><p>Choose your songs, share one style, and train an acoustic LoRA.</p></div></section>
+      <section class="trainer-panel">
+        <div class="trainer-grid"><div><label for="trainerName">Project name</label><input id="trainerName" placeholder="My style experiment"></div><div><label for="trainerGoal">What should it learn?</label><select id="trainerGoal"><option value="production">Production style</option><option value="singer_style">Singer + style · experimental</option></select></div></div>
+        <details><summary>ⓘ Choosing your training goal</summary><p class="hint">For production style, use recordings with a consistent sound. For singer + style, use the same singer and related production. This acoustic trainer may learn vocal texture, but reliable voice cloning is not established. The goal labels your project; it does not promise to separate voice from instruments.</p></details>
+        <label for="trainerFolder">Folder of songs on this PC</label><div class="row"><input id="trainerFolder" placeholder="Paste a dataset folder path" spellcheck="false"></div>
+        <label for="trainerClip">Training clip length · seconds</label><input id="trainerClip" type="number" min="2" max="30" step="1" value="10">
+        <details><summary>ⓘ Shared style and clip length</summary><p class="hint">Describe the shared sound: instruments, genre, vocal delivery, and production. Every selected song uses the same description. Clip estimates count complete fixed-length clips; shorter tails are excluded. Longer clips will require more training memory.</p></details>
+        <button type="button" class="button primary" id="trainerScan">Scan folder</button>
+        <p id="trainerStatus" class="hint" role="status">Choose a folder to inspect its audio. No matching text files are needed.</p>
+      </section>
+      <section class="trainer-panel" id="trainerReview" hidden>
+        <h2>Review your dataset</h2><p id="trainerSummary" class="hint"></p>
+        <label for="trainerTrigger">Trigger phrase</label><input id="trainerTrigger" placeholder="my_acoustic_style">
+        <label for="trainerCaption">Shared style for all selected songs</label><textarea id="trainerCaption" rows="6" placeholder="Describe the shared instruments, vocal character, genre, and production…"></textarea>
+        <p class="hint">This description is saved once in your training setup and applies to every selected song.</p>
+        <div class="row wrap"><button class="button subtle small" id="trainerSelectAll">Select usable songs</button><button class="button subtle small" id="trainerSelectNone">Deselect all</button></div>
+        <div id="trainerTracks"></div>
+        <button type="button" class="button primary" id="trainerSave">Save training setup</button><p id="trainerSaveStatus" class="hint" role="status"></p>
+        <p class="hint">Each save creates a new project version. This prepares your setup; it does not start training or reserve the GPU.</p>
+      </section>
+      <section class="trainer-panel"><h2>Saved training projects</h2><div class="row"><select id="trainerProjects" aria-label="Saved training projects"><option value="">No saved projects</option></select><button class="button subtle" id="trainerOpen">Open setup</button><button class="button subtle" id="trainerRefresh">Refresh</button></div></section>
+      <section class="trainer-panel">
+        <h2>Train a style LoRA</h2>
+        <p class="hint">Uses the saved project selected above, not unsaved form edits. Training joins Studio's GPU queue after existing jobs. Other apps are not managed by this queue.</p>
+        <div class="trainer-grid">
+          <div><label for="trainerSteps">Training steps</label><input id="trainerSteps" type="number" min="1" max="10000" step="1" value="20"><details><summary>ⓘ How much training?</summary><p class="hint">20 steps is a wiring smoke test, not a finished voice/style model. Each step learns from one clip. More steps can strengthen the effect, but excessive repetition can overfit and damage musical variety. Loss alone cannot tell you whether it sounds better.</p></details></div>
+          <div><label for="trainerRate">Learning rate</label><input id="trainerRate" type="number" min="0.000001" max="0.001" step="0.000001" value="0.0001"><details><summary>ⓘ How strongly does it learn?</summary><p class="hint">The peak update size; training warms up then tapers it. Start at 0.0001. Larger values can learn faster but become unstable or spoil the sound; smaller values may need more steps. There is no universal safe cutoff. Non-finite loss or gradients stop the run.</p></details></div>
+          <div><label for="trainerRank">LoRA rank</label><input id="trainerRank" type="number" min="2" max="64" step="1" value="8"><details><summary>ⓘ How much can it remember?</summary><p class="hint">Rank controls adapter capacity and memory use. Start at 8. Higher ranks produce larger files and can overfit a small collection. This version trains acoustic attention only; it does not retrain the song composer or guarantee singer identity.</p></details></div>
+          <div><label for="trainerCheckpoint">Save every · steps</label><input id="trainerCheckpoint" type="number" min="1" max="1000" step="1" value="20"><details><summary>ⓘ Checkpoints and stopping</summary><p class="hint">Keep intermediate adapters to audition later. Frequent saves use more disk space. Cancel waits for a safe boundary and saves completed training updates; closing Studio may force-stop after 10 seconds. Existing checkpoints survive. These adapter files are for inference, not exact optimizer-state resume.</p></details></div>
+        </div>
+        <details><summary>ⓘ Models, caching, and the first run</summary><p class="hint">Uses the local YuE2 and VAE folders from Models &amp; runtime, independently of the inference backend. Requires a BF16 NVIDIA GPU; actual training memory use is still experimental. All selected audio clips are encoded first, even for a 20-step test. The cache is reused when source audio, VAE identity, and clip settings match. Original songs and model weights are never overwritten.</p></details>
+        <button class="button primary" id="trainerTrain">Queue training</button>
+        <p id="trainerTrainStatus" class="hint" role="status">Start with the 20-step smoke test. No GPU training starts until you queue it.</p>
+        <h3>Training runs</h3><div id="trainerRuns" aria-live="polite"></div>
+      </section>
+    </main>
     <main id="createView">
       <section class="page-intro"><div><div class="eyebrow"><span class="tiny-line"></span> FROM AN IDEA TO A SONG</div><h1>Make something worth hearing.</h1><p>Your words, your direction. A whole new sound.</p></div><button class="button quiet" id="newProject"><svg><use href="#i-plus"/></svg>New song</button></section>
       <section class="music-engine-bar" aria-label="Music engine"><div><label for="musicEngine">MUSIC ENGINE</label><select id="musicEngine"><option value="torch">Torch · original engine</option><option value="audio.cpp">GGUF · lower memory</option><option value="" disabled hidden>Advanced engine active</option></select></div><p id="musicEngineStatus" role="status">Checking engine…</p><button class="button subtle" id="manageModels">Set up GGUF / Models</button></section>
@@ -71,6 +115,20 @@
             <p class="hint" id="lyricsHint">Section tags guide the arrangement. Keep instruments and performance directions in Style.</p>
             <details class="score-details" id="scoreDetails"><summary><span><svg><use href="#i-file"/></svg>Melody & score <span class="muted">ABC</span></span><span id="scoreBadge">Optional</span></summary><div class="score-body"><p class="hint">Supply a native two-voice ABC score to use an existing melody. A supplied score bypasses the planner. Edit a copy; original run artifacts stay intact.</p><textarea id="abc" class="code-input" rows="10" spellcheck="false" placeholder="Paste native YuE2 / SheetSage2 ABC, or import a .abc file."></textarea><div class="row wrap"><button class="button subtle small" id="importAbc">Import ABC</button><button class="button subtle small" id="checkAbc">Check score</button><button class="button subtle small" id="prepareAbc">Prepare melody</button><select id="keepVoice" aria-label="Melodies to retain"><option value="both">Keep both melodies</option><option value="Vocal">Keep vocal only</option><option value="Ins">Keep instrumental only</option></select></div><p class="hint">Prepare melody removes chord symbols and checks that the retained notes, timing and meter stay unchanged. Selecting one voice silences the other.</p><div id="scoreResult" class="feedback" role="status" hidden></div></div></details>
             <div class="generation-options"><div><label for="planMode">Generation mode</label><select id="planMode"><option value="full">Full · melody + harmony</option><option value="melody">Melody · free accompaniment</option><option value="off">Direct audio · no score</option></select><p id="modeHint" class="hint">Plans a melody with chords, then renders the song.</p></div><div><label for="seed">Seed</label><div class="seed-input"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]+" value="831001" maxlength="19"><button id="randomSeed" title="Choose a random seed" aria-label="Choose a random seed"><svg><use href="#i-refresh"/></svg></button></div><p class="hint">Keep the seed to compare variations.</p></div></div>
+            <section class="lora-controls" aria-label="Style LoRA">
+              <div class="row wrap"><label for="loraSelect">Style LoRA <span class="count-badge">Experimental</span></label><button type="button" class="button subtle small" id="refreshLoras">Refresh list</button></div>
+              <select id="loraSelect"><option value="">None · original YuE2</option></select>
+              <p class="hint" id="loraStatus" role="status">Checking local adapters…</p>
+              <div id="loraOptions" hidden>
+                <label for="loraStrength">Strength · <output id="loraStrengthValue" for="loraStrength">1.00</output></label>
+                <input id="loraStrength" type="range" min="0" max="2" step="0.05" value="1">
+                <details class="lora-help"><summary>ⓘ What does strength do?</summary><p class="hint" id="loraStrengthHelp">0 has no effect; 1 is the starting point. Above 1 may distort audio or reduce coherence.</p></details>
+                <p class="hint">Trigger phrase: <span id="loraTrigger">No phrase recorded</span></p>
+                <label class="check-label"><input id="loraAutoTrigger" type="checkbox" checked>Automatically include trigger phrase</label>
+                <p class="hint">Added to the submitted style without changing your editor. Your choice is saved with each song.</p>
+              </div>
+              <details class="lora-help"><summary>Add a local LoRA / folder location</summary><p class="hint" id="loraFolder"></p><label for="loraLocalPath">Or paste a local YuE2 adapter path</label><div class="row"><input id="loraLocalPath" type="text" placeholder="E:\models\my_style.safetensors" spellcheck="false"><button type="button" class="button subtle small" id="useLocalLora">Use file</button></div><p class="hint">YuE2 acoustic Style adapters only. Adapters for other models cannot be used here.</p></details>
+            </section>
             <p id="ggufNote" class="hint" hidden>Experimental GGUF: install audio.cpp separately, then connect it and download model files through Set up GGUF / Models. PyTorch runtime controls do not apply. Full songs and supplied-score covers are supported; Plan only and generated score export require torch.</p><p id="compatibilityNote" class="hint" hidden></p><button class="advanced-trigger" id="advancedButton"><span><svg><use href="#i-sliders"/></svg>Advanced settings <span class="count-badge" id="changedCount">Default</span></span><span>Every control, explained <svg><use href="#i-arrow"/></svg></span></button>
           </div>
           <footer class="create-footer"><div><span class="pill mint">48 kHz · Stereo</span><span class="footer-note" id="renderSummary">32 synthesis steps · Lossless FLAC</span></div><div class="row"><button class="button subtle" id="planButton">Plan only</button><button class="button primary" id="generateButton">Create song<svg><use href="#i-arrow"/></svg></button></div></footer>

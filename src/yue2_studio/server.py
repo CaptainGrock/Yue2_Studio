@@ -126,6 +126,15 @@ class Handler(BaseHTTPRequestHandler):
                     'installed':{name:(ROOT/'models'/name).is_dir() for name in ('YuE2-3B','YuE2-Vae','SheetSage2','MERT-v2-FullSong')}})
             elif path=='/api/models':
                 self.json(self.server.models.status())
+            elif path=='/api/loras':
+                from .loras import catalogue
+                self.json(catalogue())
+            elif path=='/api/trainer/projects':
+                from .trainer import projects
+                self.json({'projects':projects()})
+            elif re.fullmatch(r'/api/trainer/projects/[a-f0-9]{32}',path):
+                from .trainer import load_project
+                self.json(load_project(path.split('/')[-1]))
             elif path=='/api/jobs':
                 self.json({'jobs':self.server.jobs.list()})
             elif path=='/api/surprises':
@@ -147,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
-            elif path in ('/','/index.html','/app.js','/models.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/models.js','/loras.js','/trainer.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)
@@ -217,6 +226,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.json(self.server.jobs.transcribe(data),202)
             elif path=='/api/score':
                 self.json(score_check(data.get('abc',''),data.get('strip',False),data.get('keep_voice','both')))
+            elif path=='/api/loras/inspect':
+                from .loras import inspect_adapter
+                self.json(inspect_adapter(data.get('path')))
+            elif path=='/api/trainer/scan':
+                from .trainer import scan
+                self.json(scan(data))
+            elif path=='/api/trainer/check':
+                from .trainer_setup import readiness
+                self.json(readiness(data))
+            elif path=='/api/trainer/download':
+                if set(data)!={'confirmed'} or data['confirmed'] is not True:
+                    raise ValueError('Confirm the training-model download first.')
+                self.json(self.server.jobs.download_training_models(),201)
+            elif path=='/api/trainer/projects':
+                from .trainer import save_project
+                self.json(save_project(data),201)
+            elif path=='/api/trainer/train':
+                from .trainer_setup import readiness
+                from .trainer import training_spec
+                spec = training_spec(data)
+                checked = readiness({key:spec[key] for key in ('model','vae')} | {'project_id':data['project_id']})
+                if not checked['ready']:
+                    raise ValueError(' '.join(checked['issues']))
+                self.json(self.server.jobs.train(data),201)
             elif path=='/api/settings/validate':
                 self.json({'settings':validate_settings(data)})
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/cancel',path):

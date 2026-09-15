@@ -10,6 +10,9 @@ from .compatibility import capabilities, compatible_runtime
 def run(path):
     spec = json.loads(Path(path).read_text(encoding='utf-8'))
     settings = spec['settings']
+    selection = settings.get('lora', {})
+    if selection.get('path') and settings['runtime']['backend']=='audio.cpp':
+        raise ValueError('Style LoRAs are not supported by audio.cpp.')
     if settings['runtime']['backend']=='audio.cpp':
         from .gguf import run
         return run(path)
@@ -27,6 +30,11 @@ def run(path):
     output = Path(path).parent / 'result'
     output.mkdir(exist_ok=False)
     with YuE2Pipeline.from_pretrained(**runtime,generation_config=config) as pipe:
+        if selection.get('path'):
+            info = pipe.load_lora(selection['path'], strength=selection['strength'])
+            if info['sha256'] != spec.get('lora',{}).get('sha256'):
+                raise ValueError('LoRA file changed after this song was queued; no audio was generated.')
+            print('Studio LoRA: '+Path(info['path']).name+' · strength '+str(info['strength']), flush=True)
         if spec['stage']=='plan':
             plan = pipe.plan(**spec['request'])
             plan.save(output)
