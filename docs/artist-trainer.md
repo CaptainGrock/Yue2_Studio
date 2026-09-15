@@ -2,6 +2,12 @@
 
 ## Setup walkthrough
 
+![Artist dataset and lyric pairing](../images/artist-trainer-dataset.png)
+
+This workspace capture shows an example path, a local-only recovery shortcut and
+a historical test banner. Those are not a supplied dataset or verification of
+your PC. Use the release setup controls described below.
+
 Artist trainer is its own sidebar entry below Style trainer. It learns an AR
 adapter from full songs and lyrics; Style Trainer learns an acoustic adapter from
 clips without lyric sidecars. Neither guarantees voice cloning.
@@ -38,6 +44,10 @@ mixed with your dataset. Opening the page downloads nothing. Allow space for ful
 models, a separate runtime, caches and adapter checkpoints. See [setup details](artist-setup.md).
 
 ## Training controls and progress
+
+![Artist training controls with example values](../images/artist-trainer-controls.png)
+
+The screenshot shows older **800 / 200** values; current defaults are **500 / 250**.
 
 | Control | Default | Meaning |
 | --- | --- | --- |

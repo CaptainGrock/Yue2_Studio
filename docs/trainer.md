@@ -28,6 +28,10 @@ version to retain changes. Unsaved edits remain only in the current page.
 
 ## Train a saved setup
 
+![Style training controls with 2,000 steps and checkpoints every 500](../images/style-trainer-controls.png)
+
+![Saved training project selector](../images/saved-training-projects.png)
+
 Select a saved project, then choose **Queue training**. This uses that saved
 snapshot, not unsaved form changes. Click the information disclosures beside
 steps, learning rate, rank and checkpoint interval for tradeoffs. Defaults are

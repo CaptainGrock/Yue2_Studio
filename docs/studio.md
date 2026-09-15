@@ -4,9 +4,10 @@ A local HTML/CSS/JavaScript music studio backed by the installed Python engines.
 Node build or CDN is needed. Normal Studio uses the existing YuE2 environment;
 Artist Trainer requires its own explicitly installed runtime.
 
-This guide covers the current controls. Some screenshots show earlier layouts;
-replacement screenshots for the trainers, LoRA controls and library are pending.
-Follow the text when a screenshot differs.
+This guide covers the current controls. Screenshots include the author's workspace:
+paths/names are examples, recovery shortcuts are local-only, and Artist controls
+show older 800/200 values rather than current 500/250 defaults. Follow the text
+when screenshot settings or historical status banners differ.
 
 Quick links: [trainers](#train-your-own-lora), [LoRA playback](#use-a-lora),
 [seed and comparison limits](#seeds-and-comparing-results),
@@ -80,6 +81,8 @@ Combine search and the existing run filters with **Created today**, **Created ye
 **Last 7 days**, **Last 30 days**, or **Choose a date…**. Dates use your browser's
 local calendar and the run's creation time, not its completion time. The last-7/30-day
 presets include today. **Any date** removes the date restriction.
+
+![Song library with favorite stars, title pencils, search and date filter](../images/song-library.png)
 
 An empty lyrics field is allowed for instrumental requests; describe the instrumental intent in Style.
 There is no supported exact-duration setting. Sampling maxima cap tokens, and the UI flags truncation
@@ -199,6 +202,11 @@ For the alternative lower-VRAM runtime, follow the [GGUF setup guide](gguf.md). 
 
 ## Train your own LoRA
 
+![Choose recordings and clip length in Style Trainer](../images/style-trainer-dataset.png)
+
+The shown dataset path and **Use recovered dataset** shortcut belong to the
+author's workspace. Release users enter their own folder; that shortcut is not shipped.
+
 **Style trainer** and **Artist trainer** are separate entries in the left sidebar,
 with Artist below Style. Both are experimental; neither promises a cloned singer.
 
@@ -227,6 +235,13 @@ the full lyrics against each selected song, enter shared style/trigger and save.
 The last selected song is held out for validation. Choose training controls and
 explicitly queue training; the saved dataset/style snapshot is used, not unsaved edits.
 
+![Reopen a saved training project](../images/saved-training-projects.png)
+
+![Artist dataset, full lyric pairing, shared style and trigger](../images/artist-trainer-dataset.png)
+
+The historical verification banner in this workspace capture is not a readiness
+result for another installation. Run Check setup on your own PC.
+
 Training shares Studio's serial queue with rendering and transcription. Setup
 checks do not allocate GPU memory, but actual preparation/training does. Separate
 Studio instances, games and local LLMs are not coordinated by this queue.
@@ -240,6 +255,8 @@ an exact continuation. Cancellation waits for a safe boundary where supported;
 force-closing can lose unsaved work. [Artist setup and test limits](artist-setup.md).
 
 ## Use a LoRA
+
+![Shared Style and Artist LoRA selector](../images/lora-selector.png)
 
 Choose **Style / Artist LoRA** in Create music or Surprise me, then **Refresh list**
 if a new adapter is missing. A local-path control also accepts compatible files.
@@ -301,6 +318,40 @@ test verified unchanged parameter hashes after unloading the Artist bundle and
 after interruption, plus exact fixed-token synthesis restoration. It did **not**
 establish bit-identical repeated sampled songs. Keep generated files for exact
 playback of a result; rerendering or Retry saved song can produce a different one.
+
+## Shape the generation
+
+![Experimental Composition, Performance and Style influence sliders](../images/shape-generation.png)
+
+The screenshot predates the corrected comparison hint: a fixed seed does not
+guarantee identical music. Compare multiple fixed-input runs as described above.
+
+These three five-position sliders are shortcuts to existing Advanced settings,
+not a separate model or trainer. The middle position restores the default values
+for that slider. **Reset sliders** resets only their sampling/CFG fields, not your
+LoRA, text, seed, token limits, synthesis steps or other settings.
+
+- **Composition:** familiar to unexpected; planner temperature, top-p and top-k.
+  Disabled for No score or a supplied ABC because the planner is bypassed.
+- **Performance:** controlled to adventurous; semantic/audio-token temperature,
+  top-p and top-k. It does not directly set vocal register, instruments or duration.
+- **Style influence:** loose to focused; semantic CFG guidance for style and lyrics.
+  It does not change LoRA strength or replace your style text. Higher is not always better.
+
+Click each **?** bubble for what changes and possible tradeoffs. Caution bands are
+not guaranteed failure thresholds. All three are disabled for GGUF. Advanced
+values outside the presets display **Custom advanced values** without being overwritten.
+Changes affect future submissions, not existing audio or queued jobs, and the exact
+settings are saved with drafts/projects/runs. [Exact mappings](settings.md#shape-the-generation).
+
+## Studio appearance
+
+![Five Studio appearance presets](../images/appearance-presets.png)
+
+Open Studio appearance in the sidebar to choose Midnight Moss, Deep Ocean,
+Velvet Violet, Warm Ember or Retina Roast. The choice is saved in this browser;
+it changes the interface colors, not your music settings. **Use original theme**
+returns to Midnight Moss.
 
 ## Settings and storage
 

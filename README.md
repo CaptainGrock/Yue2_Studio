@@ -200,8 +200,8 @@ The server is local-only; cloning gives each user their own studio, not access t
 
 ## See the Studio
 
-Some images show earlier layouts. Updated trainer, LoRA and library screenshots
-are pending; the written guide describes the current controls.
+Some images show earlier layouts. The new trainer, LoRA, library and appearance
+captures are appended below, with captions explaining workspace-only details.
 
 | Create a song | Create a cover |
 | --- | --- |
@@ -224,3 +224,33 @@ are pending; the written guide describes the current controls.
 ![GPU memory preset with the effective budget](images/gpu-memory-preset.png)
 
 Click any screenshot to see it full size. The [illustrated guide](docs/studio.md) walks through each screen.
+
+### Trainers, library and experimental controls
+
+These screenshots show the author's workspace. Example paths/project names are
+not bundled datasets. The recovery shortcuts and historical verification banner
+shown in that workspace are not release controls/status. Artist defaults are now
+**500 steps / save every 250**, not the older 800/200 shown below.
+
+| Style dataset | Style training controls |
+| --- | --- |
+| ![Choose songs and a clip length for Style training](images/style-trainer-dataset.png) | ![Style training steps, rank, learning rate and checkpoints](images/style-trainer-controls.png) |
+
+![Reopen a saved training setup](images/saved-training-projects.png)
+
+| Artist dataset and lyrics | Artist training controls |
+| --- | --- |
+| ![Artist song folder, lyric pairing, trigger and shared style](images/artist-trainer-dataset.png) | ![Artist training controls; screenshot values are not the current defaults](images/artist-trainer-controls.png) |
+
+![Style or Artist LoRA selection](images/lora-selector.png)
+
+![Shape the generation experimental sliders](images/shape-generation.png)
+
+Composition, Performance and Style influence map to existing advanced settings.
+Click **?** for explanations and cautions. The current UI corrects the screenshot's
+comparison hint: **same seed does not guarantee identical music**.
+[Slider settings and limits](docs/settings.md#shape-the-generation).
+
+![Song library with stars, title editing, search and date filters](images/song-library.png)
+
+![Studio appearance presets](images/appearance-presets.png)
