@@ -150,7 +150,7 @@ def training_spec(payload):
         raise ValueError('Save a project with a shared style before training.')
     validate_sources(project)
     controls = {}
-    for name, default, low, high in [('steps',20,1,10000),('rank',8,2,64),('checkpoint_every',20,1,1000)]:
+    for name, default, low, high in [('steps',2000,1,10000),('rank',8,2,64),('checkpoint_every',500,1,1000)]:
         value = payload.get(name,default)
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f'{name} must be an integer between {low} and {high}.')

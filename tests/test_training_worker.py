@@ -83,7 +83,8 @@ def test_queue_snapshot_validation_and_cooperative_cancel(tmp_path,monkeypatch):
     assert manager.queue.get_nowait()==job['id']
     spec=manager.detail(job['id'])['input']
     assert spec['project']['default_caption']=='Warm guitar'
-    assert spec['controls']['steps']==20
+    assert spec['controls']['steps']==2000
+    assert spec['controls']['checkpoint_every']==500
     assert 'yue2_studio.training_worker' in manager._command(job['id'],spec)
     class Process:
         def poll(self):return None

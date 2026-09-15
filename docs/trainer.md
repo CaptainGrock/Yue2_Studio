@@ -18,7 +18,8 @@ convert an unsupported recording to WAV before including it.
 
 **Save training setup** validates the selected songs and creates a new JSON
 version under `training/projects`. It records the shared style, source
-paths, file sizes/timestamps, clip settings and the training goal. Source songs
+paths, file sizes/timestamps and clip settings. Legacy goal metadata is accepted
+for compatibility; it does not select a different training method. Source songs
 and sidecars are unchanged. Saved versions can be reopened in the tab; save a new
 version to retain changes. Unsaved edits remain only in the current page.
 
@@ -26,9 +27,16 @@ version to retain changes. Unsaved edits remain only in the current page.
 
 Select a saved project, then choose **Queue training**. This uses that saved
 snapshot, not unsaved form changes. Click the information disclosures beside
-steps, learning rate, rank and checkpoint interval for tradeoffs. The default
-20-step run is a smoke test, not a finished style model. Each optimizer step uses
+steps, learning rate, rank and checkpoint interval for tradeoffs. Defaults are
+2,000 training steps and a checkpoint every 500 steps. Set 20 steps explicitly
+for a technical smoke test, not a finished style model. Each optimizer step uses
 one clip; batches are shuffled across the dataset. No lyric files are loaded.
+
+Clip length is the size of consecutive chunks across each selected song, not a
+limit to its first few seconds. A three-minute song makes 18 ten-second clips;
+shorter leftover endings are excluded. Training cycles through shuffled clips,
+so enough steps are needed to visit all clips. Longer clips need more VRAM and
+provide more context; they do not change generated song length or source files.
 
 Training runs in the same single-worker queue as generation and transcription;
 existing Studio jobs finish first. This does not coordinate GPU use by other

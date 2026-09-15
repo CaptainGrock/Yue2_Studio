@@ -67,7 +67,7 @@ function bindTrainer(){
   $('trainerSave').onclick=()=>busy('trainerSave',async()=>{
     if(!trainerData)throw new Error('Scan a dataset first.');
     const options=trainerOptions();if(options.folder!==trainerData.folder||options.clip_seconds!==trainerData.clip_seconds)throw new Error('Folder or scan options changed. Scan again before saving.');
-    const saved=await api('/api/trainer/projects',{...options,name:$('trainerName').value,goal:$('trainerGoal').value,trigger:$('trainerTrigger').value,default_caption:$('trainerCaption').value,
+    const saved=await api('/api/trainer/projects',{...options,name:$('trainerName').value,goal:'production',trigger:$('trainerTrigger').value,default_caption:$('trainerCaption').value,
       tracks:trainerData.tracks.map(({name,bytes,mtime_ns,enabled})=>({name,bytes,mtime_ns,enabled}))});
     $('trainerSaveStatus').textContent='Saved setup: '+saved.name+' · '+saved.id.slice(0,8)+'. Training has not started.';await refreshTrainer();$('trainerProjects').value=saved.id;toast('Training setup saved.');
   });
@@ -75,7 +75,7 @@ function bindTrainer(){
     const id=$('trainerProjects').value;if(!id)return;
     const open=()=>busy('trainerOpen',async()=>{
       const data=await api('/api/trainer/projects/'+id);trainerData=data;
-      $('trainerName').value=data.name;$('trainerGoal').value=data.goal;$('trainerFolder').value=data.folder;$('trainerClip').value=data.clip_seconds;$('trainerTrigger').value=data.trigger;$('trainerCaption').value=data.default_caption;
+      $('trainerName').value=data.name;$('trainerFolder').value=data.folder;$('trainerClip').value=data.clip_seconds;$('trainerTrigger').value=data.trigger;$('trainerCaption').value=data.default_caption;
       $('trainerStatus').textContent=data.note;$('trainerSaveStatus').textContent='Loaded saved setup. Saving rechecks source files and creates a new version.';renderTrainer();
     });
     if(trainerData)confirmReplace('Open this training setup?','This replaces the current training form. Save it first if you want to keep your edits.',open);else open();

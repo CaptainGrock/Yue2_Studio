@@ -110,5 +110,7 @@ def test_http_scan_save_open_and_no_render_jobs(dataset,tmp_path):
             job=post('/api/trainer/train',{'project_id':saved['id']})
         assert job['kind']=='training' and job['status']=='queued'
         assert manager.detail(job['id'])['input']['project']['default_caption']=='Piano'
+        assert manager.detail(job['id'])['input']['controls']['steps']==2000
+        assert manager.detail(job['id'])['input']['controls']['checkpoint_every']==500
     finally:
         server.shutdown();server.server_close();thread.join(timeout=5)

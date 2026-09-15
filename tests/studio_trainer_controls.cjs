@@ -34,6 +34,11 @@ vm.runInContext(fs.readFileSync('src/yue2_studio/static/trainer.js','utf8'),cont
  assert.equal(calls.filter(c=>c.url==='/api/trainer/train').length,1);
  assert.equal(calls.find(c=>c.url==='/api/trainer/download').data.confirmed,true);
  const html=fs.readFileSync('src/yue2_studio/static/index.html','utf8');
+ assert(!html.includes('trainerGoal'),'Do not offer a cosmetic training-goal selector');
+ assert.match(html,/id="trainerSteps"[^>]*value="2000"/);
+ assert.match(html,/id="trainerCheckpoint"[^>]*value="500"/);
+ assert.match(html,/id="trainerClip"[^>]*aria-describedby="trainerClipHint"/);
+ assert.match(html,/3-minute song produces 18 ten-second clips/);
  for(const id of ['trainerTrain','trainerSteps','trainerRate','trainerRank','trainerCheckpoint','trainerRuns'])assert.ok(html.includes('id="'+id+'"'));
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);
  assert.equal(ids.length,new Set(ids).size,'HTML IDs must be unique');
