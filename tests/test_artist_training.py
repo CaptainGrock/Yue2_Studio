@@ -133,7 +133,10 @@ def test_validation_controls_and_holdout(tmp_path,monkeypatch):
     valid={'project_id':project['id'],'gpu_confirmed':True}
     spec=training.training_spec(valid)
     assert spec['python']=='custom/python.exe' and spec['paths']=={'model':'custom-model'}
-    assert spec['holdout']=='b' and spec['controls']['steps']==800
+    assert spec['holdout']=='b' and spec['controls']['steps']==500
+    assert spec['controls']['checkpoint_every']==250
+    explicit=training.training_spec(dict(valid,steps=800,checkpoint_every=200))
+    assert explicit['controls']['steps']==800 and explicit['controls']['checkpoint_every']==200
     for key,value in [('steps',True),('steps',1601),('rank',0),('alignment_weight',float('nan')),('learning_rate',1),('python','bad')]:
         with pytest.raises(ValueError):training.training_spec(dict(valid,**{key:value}))
 

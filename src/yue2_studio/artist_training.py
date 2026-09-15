@@ -32,7 +32,7 @@ def training_spec(payload):
     project=artist_trainer.load_project(str(payload.get('project_id','')))
     selected=validate_project(project)
     controls={}
-    for key,default,lo,hi in [('steps',800,1,1600),('rank',64,8,64),('checkpoint_every',200,1,400)]:
+    for key,default,lo,hi in [('steps',500,1,1600),('rank',64,8,64),('checkpoint_every',250,1,400)]:
         value=payload.get(key,default)
         if type(value) is not int or not lo<=value<=hi:raise ValueError(f'{key} must be an integer from {lo} to {hi}.')
         controls[key]=value

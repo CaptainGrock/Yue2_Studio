@@ -18,8 +18,8 @@ Setup runs in the shared serial queue, with results/errors in Library → Open r
 Scan matching audio and full lyric files, review the lyrics, enter a shared style
 and trigger, and save a versioned setup. Source files are not changed. Training
 requires a saved setup, at least two 30–360 second recordings and explicit GPU
-approval. The last selected song is held out; controls default to 800 updates,
-rank 64, learning rate 0.0001, checkpoint interval 200 and alignment weight 0.08.
+approval. The last selected song is held out; controls default to 500 updates,
+rank 64, learning rate 0.0001, checkpoint interval 250 and alignment weight 0.08.
 Alignment's first use may download Demucs/MMS weights; zero alignment weight
 skips separation/alignment but not lyric conditioning. No silent clipping occurs.
 

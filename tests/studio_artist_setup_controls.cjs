@@ -17,6 +17,8 @@ vm.runInContext(fs.readFileSync('src/yue2_studio/static/artist.js','utf8'),conte
  await el('artistInstall').onclick();assert.equal(calls.at(-1).data.action,'install-runtime');
  assert(calls.every(c=>!c.url.endsWith('/train')));
  const html=fs.readFileSync('src/yue2_studio/static/index.html','utf8');
+ assert(/id="artistSteps"[^>]*value="500"/.test(html));
+ assert(/id="artistCheckpoint"[^>]*value="250"/.test(html));
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
  assert.equal(ids.length,new Set(ids).size);
  const script=fs.readFileSync('src/yue2_studio/static/artist.js','utf8');
