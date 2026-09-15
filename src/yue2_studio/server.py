@@ -129,6 +129,15 @@ class Handler(BaseHTTPRequestHandler):
             elif path=='/api/loras':
                 from .loras import catalogue
                 self.json(catalogue())
+            elif path=='/api/artist-trainer/projects':
+                from .artist_trainer import projects
+                self.json({'projects':projects()})
+            elif path=='/api/artist-trainer/paths':
+                from .artist_setup import model_paths
+                self.json({'paths':model_paths()})
+            elif re.fullmatch(r'/api/artist-trainer/projects/[a-f0-9]{32}',path):
+                from .artist_trainer import load_project
+                self.json(load_project(path.split('/')[-1]))
             elif path=='/api/trainer/projects':
                 from .trainer import projects
                 self.json({'projects':projects()})
@@ -156,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
-            elif path in ('/','/index.html','/app.js','/library.js','/models.js','/loras.js','/trainer.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)
@@ -229,6 +238,13 @@ class Handler(BaseHTTPRequestHandler):
             elif path=='/api/loras/inspect':
                 from .loras import inspect_adapter
                 self.json(inspect_adapter(data.get('path')))
+            elif path=='/api/artist-trainer/scan':
+                from .artist_trainer import scan
+                self.json(scan(data))
+            elif path=='/api/artist-trainer/setup':
+                self.json(self.server.jobs.prepare_artist(data),202)
+            elif path=='/api/artist-trainer/train':
+                self.json(self.server.jobs.train_artist(data),202)
             elif path=='/api/trainer/scan':
                 from .trainer import scan
                 self.json(scan(data))
@@ -239,6 +255,9 @@ class Handler(BaseHTTPRequestHandler):
                 if set(data)!={'confirmed'} or data['confirmed'] is not True:
                     raise ValueError('Confirm the training-model download first.')
                 self.json(self.server.jobs.download_training_models(),201)
+            elif path=='/api/artist-trainer/projects':
+                from .artist_trainer import save_project
+                self.json(save_project(data),201)
             elif path=='/api/trainer/projects':
                 from .trainer import save_project
                 self.json(save_project(data),201)

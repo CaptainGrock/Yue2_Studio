@@ -1,8 +1,8 @@
 # YuE2 Studio · Beta
 
 A local web studio for **YuE2** with original songs, melody covers, an LLM writing room,
-automatic song batches, experimental Style LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
-no Gradio, Node build, or extra runtime Python dependencies beyond the installed engines.
+automatic song batches, experimental Style and Artist LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
+no Gradio or Node build. Artist training has a separate, explicitly installed runtime.
 
 **Beta preview:** tested on Windows with an RTX 5090. Other hardware configurations
 are still being validated. GGUF and lower-VRAM presets remain experimental.
@@ -52,6 +52,14 @@ The installer also installs acoustic LoRA support in `src/yue2/pipeline.py` and
 it. The supported baseline is the upstream commit above; keep a separate copy of
 any custom engine changes. See [Style Trainer setup](docs/trainer.md) and
 [LoRA playback](docs/lora.md). These are Studio extensions, not upstream training APIs.
+
+The experimental [Artist Trainer](docs/artist-trainer.md) adds full-song lyric
+conditioning and AR adapters with a pinned community acoustic companion. Follow
+[Artist setup](docs/artist-setup.md) for separate dependencies, model paths and
+terms. Playback requires No score, Torch, no quantization and AR offloading off;
+GGUF and arbitrary adapter stacking are unsupported. The installer also accepts
+the known merged Style Trainer pipeline, with backups, but rejects unfamiliar
+Artist adapter code. Fresh dependency/download and GPU tests remain release gates.
 
 The installer modifies `src/yue2/cuda_graph.py` to detect builds without compiled
 Flash Attention, keeping fast CUDA graphs through cuDNN/SDPA. It also installs the

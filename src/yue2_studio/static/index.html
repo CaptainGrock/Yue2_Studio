@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/loras.js" defer></script><script src="/trainer.js" defer></script><script src="/app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/loras.js" defer></script><script src="/trainer.js" defer></script><script src="/artist.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <svg class="icon-defs" aria-hidden="true"><defs>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -28,6 +28,7 @@
     <nav aria-label="Main navigation">
       <button class="nav-item active" data-view="create"><svg><use href="#i-music"/></svg>Create music</button>
       <button class="nav-item" data-view="trainer"><svg><use href="#i-sliders"/></svg>Style trainer <span class="count-badge">Beta</span></button>
+      <button class="nav-item" data-view="artist"><svg><use href="#i-music"/></svg>Artist trainer <span class="count-badge">Experimental</span></button>
       <button class="nav-item" data-view="library"><svg><use href="#i-library"/></svg>Song library <span id="libraryCount" class="nav-count">0</span></button>
     </nav>
     <div class="sidebar-rule"></div>
@@ -92,6 +93,54 @@
         <h3>Training runs</h3><div id="trainerRuns" aria-live="polite"></div>
       </section>
     </main>
+    <main id="artistView" hidden>
+      <section class="page-intro"><div><div class="eyebrow">EXPERIMENTAL ARTIST TRAINING</div><h1>Train your artist sound.</h1><p>Use full recordings, matching lyrics, and a shared style to train an Artist LoRA.</p></div></section>
+      <section class="trainer-panel" id="artistTrainerPanel">
+        <div class="eyebrow">SEPARATE WORKFLOW · ARTIST AR LORA</div>
+        <h2>Artist Trainer · Experimental</h2>
+        <h3>Prepare Artist Trainer</h3>
+<p class="hint">These actions use the shared queue. Checks hash local files without GPU allocation. Downloads and dependency installation require confirmation; neither starts training. Setup remains experimental.</p>
+<div id="artistModelPaths"></div>
+<label class="check-label"><input id="artistTerms" type="checkbox">I reviewed and accept the model terms, including the community noncommercial terms.</label>
+<p class="hint"><a href="https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4" target="_blank" rel="noopener noreferrer">Encoder/companion terms</a> · <a href="https://huggingface.co/datasets/Mothersuperior/yue2-minted-corpus" target="_blank" rel="noopener noreferrer">Reference pack</a> · <a href="https://huggingface.co/m-a-p/YuE2-3B" target="_blank" rel="noopener noreferrer">YuE2</a> · <a href="https://huggingface.co/m-a-p/YuE2-Vae" target="_blank" rel="noopener noreferrer">VAE</a> · <a href="https://huggingface.co/m-a-p/MERT-v2-FullSong" target="_blank" rel="noopener noreferrer">MERT</a></p>
+<div class="row wrap"><button class="button subtle" id="artistCheck">Check setup · CPU only</button><button class="button subtle" id="artistDownload">Prepare model paths / download missing</button><button class="button subtle" id="artistInstall">Install separate Artist runtime</button></div>
+<p id="artistRuntimeStatus" class="hint" role="status">Use Check setup; results and errors appear in the Library run. Preparing paths records them only after verification.</p>
+        <p class="hint">Train the song-generation branch using whole recordings, full lyrics, and shared style. Separate from Style trainer's acoustic workflow. Experimental: check the verification status above; passing a short test does not guarantee voice similarity or a stable long run. Completed Artist runs appear in the Style / Artist LoRA selector. Select No score and Torch explicitly before generation.</p>
+        <div class="trainer-grid">
+          <div><label for="artistName">Artist project name</label><input id="artistName" placeholder="My artist experiment"></div>
+          <div><label for="artistTrigger">Trigger phrase</label><input id="artistTrigger" placeholder="my_artist_sound"><details><summary>ⓘ Trigger phrase</summary><p class="hint">A distinctive phrase to associate with your artist. Future preparation will combine it with the shared style. Saving this setup does not train it yet.</p></details></div>
+        </div>
+        <label for="artistFolder">Dataset folder on this PC</label><div class="row"><input id="artistFolder" spellcheck="false"></div>
+        <label for="artistSuffix">Matching lyric filenames</label><select id="artistSuffix"><option value=".lyrics.txt">song.wav + song.lyrics.txt</option><option value=".txt">song.wav + song.txt</option></select>
+        <details><summary>ⓘ Lyrics are required for this new workflow</summary><p class="hint">Choose the naming convention used by your folder. Each audio filename must have an exact matching text filename, without its audio extension. UTF-8 text only, up to 64 KB per song. Plain .txt files are treated as lyrics only when you explicitly choose that option; style-only files are not lyrics. Include complete words with section tags, then check each preview against the recording. We do not rename or overwrite source files.</p></details>
+        <label for="artistStyle">Shared style for every selected song</label><textarea id="artistStyle" rows="5" placeholder="Genre, vocal character, instruments, and production…"></textarea>
+        <details><summary>ⓘ Shared style and full songs</summary><p class="hint">Keep lyrics separate from this description. Uses complete 30–360 second songs, not the acoustic trainer’s short clips. No model quality, encoder compatibility, or voice identity has been verified by this scan.</p></details>
+        <button class="button primary" id="artistScan">Scan audio + lyrics · CPU only</button>
+        <p id="artistStatus" class="hint" role="status">Scanning and saving do not start a GPU job.</p>
+        <div id="artistReview" hidden>
+          <p id="artistSummary" class="hint"></p>
+          <div class="row"><button class="button subtle" id="artistSelectAll">Select valid pairs</button><button class="button subtle" id="artistSelectNone">Deselect all</button></div>
+          <div id="artistTracks"></div>
+          <label class="check-label"><input type="checkbox" id="artistReviewed">I reviewed the selected lyric previews and confirmed they match the complete recordings.</label>
+          <button class="button primary" id="artistSave">Save artist setup · no training</button>
+          <p id="artistSaveStatus" class="hint" role="status"></p>
+        </div>
+        <h3>Saved artist setups</h3>
+        <div class="row"><select id="artistProjects" aria-label="Saved artist setups"><option value="">No saved artist setups</option></select><button class="button subtle" id="artistOpen">Open setup</button><button class="button subtle" id="artistRefresh">Refresh</button></div>
+        <h3>Train an Artist LoRA</h3>
+        <p class="hint">Uses the saved setup selected above, not unsaved edits. At least two 30–360 second songs; the last selected song is held out for validation. Whole songs are used without silent clipping. Reference songs make up approximately half of training examples.</p>
+        <div class="trainer-grid">
+          <div><label for="artistSteps">Training steps</label><input id="artistSteps" type="number" min="1" max="1600" value="800"><details><summary>ⓘ Steps</summary><p class="hint">Optimizer updates, with two song examples per update. More steps can overfit, not just improve. Try 20 for a technical smoke test; it is not a quality test. No reliable ETA until the first GPU run.</p></details></div>
+          <div><label for="artistRank">LoRA rank</label><input id="artistRank" type="number" min="8" max="64" value="64"><details><summary>ⓘ Rank</summary><p class="hint">Adapter capacity. 64 follows the community recipe; lower ranks use less training memory but may learn less detail.</p></details></div>
+          <div><label for="artistLearningRate">Learning rate</label><input id="artistLearningRate" type="number" min="0.000001" max="0.0003" step="0.00001" value="0.0001"><details><summary>ⓘ Learning rate</summary><p class="hint">How aggressively weights change. Default 0.0001 with warmup. Higher values can damage output or cause unstable loss. If that happens, try a lower value.</p></details></div>
+          <div><label for="artistCheckpoint">Save checkpoint every</label><input id="artistCheckpoint" type="number" min="1" max="400" value="200"><details><summary>ⓘ Checkpoints</summary><p class="hint">Keeps intermediate adapters so you can compare training lengths later. More frequent saves use more disk space. These are adapter snapshots, not exact optimizer-resume files.</p></details></div>
+          <div><label for="artistAlignment">Lyric alignment weight</label><input id="artistAlignment" type="number" min="0" max="0.2" step="0.01" value="0.08"><details><summary>ⓘ Lyric alignment</summary><p class="hint">0.08 follows the community recipe: separate vocals and align English words to audio, then add a lyric-following training signal. Higher values may overemphasize imperfect timestamps. 0 skips separation/alignment, but full lyrics still condition training. First use downloads the official Demucs/MMS weights.</p></details></div>
+        </div>
+        <label class="check-label"><input type="checkbox" id="artistGpuConfirmed">I approve GPU preparation and training for the selected saved setup.</label>
+        <button class="button primary" id="artistTrain">Queue Artist LoRA training</button>
+        <p id="artistTrainStatus" class="hint" role="status">Uses Studio's shared queue. Progress, logs, cancellation, and saved checkpoints appear in Library → Open run. Cancellation waits for a safe boundary; separation/alignment of a full song can take time.</p>
+      </section>
+    </main>
     <main id="createView">
       <section class="page-intro"><div><div class="eyebrow"><span class="tiny-line"></span> FROM AN IDEA TO A SONG</div><h1>Make something worth hearing.</h1><p>Your words, your direction. A whole new sound.</p></div><button class="button quiet" id="newProject"><svg><use href="#i-plus"/></svg>New song</button></section>
       <section class="music-engine-bar" aria-label="Music engine"><div><label for="musicEngine">MUSIC ENGINE</label><select id="musicEngine"><option value="torch">Torch · original engine</option><option value="audio.cpp">GGUF · lower memory</option><option value="" disabled hidden>Advanced engine active</option></select></div><p id="musicEngineStatus" role="status">Checking engine…</p><button class="button subtle" id="manageModels">Set up GGUF / Models</button></section>
@@ -116,8 +165,8 @@
             <p class="hint" id="lyricsHint">Section tags guide the arrangement. Keep instruments and performance directions in Style.</p>
             <details class="score-details" id="scoreDetails"><summary><span><svg><use href="#i-file"/></svg>Melody & score <span class="muted">ABC</span></span><span id="scoreBadge">Optional</span></summary><div class="score-body"><p class="hint">Supply a native two-voice ABC score to use an existing melody. A supplied score bypasses the planner. Edit a copy; original run artifacts stay intact.</p><textarea id="abc" class="code-input" rows="10" spellcheck="false" placeholder="Paste native YuE2 / SheetSage2 ABC, or import a .abc file."></textarea><div class="row wrap"><button class="button subtle small" id="importAbc">Import ABC</button><button class="button subtle small" id="checkAbc">Check score</button><button class="button subtle small" id="prepareAbc">Prepare melody</button><select id="keepVoice" aria-label="Melodies to retain"><option value="both">Keep both melodies</option><option value="Vocal">Keep vocal only</option><option value="Ins">Keep instrumental only</option></select></div><p class="hint">Prepare melody removes chord symbols and checks that the retained notes, timing and meter stay unchanged. Selecting one voice silences the other.</p><div id="scoreResult" class="feedback" role="status" hidden></div></div></details>
             <div class="generation-options"><div><label for="planMode">Generation mode</label><select id="planMode"><option value="full">Full · melody + harmony</option><option value="melody">Melody · free accompaniment</option><option value="off">Direct audio · no score</option></select><p id="modeHint" class="hint">Plans a melody with chords, then renders the song.</p></div><div><label for="seed">Seed</label><div class="seed-input"><input id="seed" type="text" inputmode="numeric" pattern="[0-9]+" value="831001" maxlength="19"><button id="randomSeed" title="Choose a random seed" aria-label="Choose a random seed"><svg><use href="#i-refresh"/></svg></button></div><p class="hint">Keep the seed to compare variations.</p></div></div>
-            <section class="lora-controls" aria-label="Style LoRA">
-              <div class="row wrap"><label for="loraSelect">Style LoRA <span class="count-badge">Experimental</span></label><button type="button" class="button subtle small" id="refreshLoras">Refresh list</button></div>
+            <section class="lora-controls" aria-label="Style / Artist LoRA">
+              <div class="row wrap"><label for="loraSelect">Style / Artist LoRA <span class="count-badge">Experimental</span></label><button type="button" class="button subtle small" id="refreshLoras">Refresh list</button></div>
               <select id="loraSelect"><option value="">None · original YuE2</option></select>
               <p class="hint" id="loraStatus" role="status">Checking local adapters…</p>
               <div id="loraOptions" hidden>

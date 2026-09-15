@@ -139,7 +139,7 @@ class SongResult:
 class YuE2Pipeline:
     @_exclusive
     def load_lora(self, path, *, strength=1.0):
-        """Select one acoustic Style adapter. None clears the selection.
+        """Select one Style adapter or Artist bundle. None clears the selection.
 
         Reads on CPU; model-specific shape checks happen at selection if loaded,
         otherwise before synthesis. Does not load the base model or start CUDA.
@@ -149,9 +149,12 @@ class YuE2Pipeline:
         if path is None:
             self._lora = None
             return None
-        from .lora import AcousticLoRA, validate_strength
+        from .lora import validate_strength
+        from .artist_lora import read_adapter
         strength = validate_strength(strength)
-        adapter = AcousticLoRA.read(path)
+        adapter = read_adapter(path)
+        if adapter.info(strength).get('kind')=='artist' and (self.backend not in ('torch','torch-eager') or self.quantization!='none' or self.offload_ar):
+            raise ValueError('Artist LoRAs require Torch, no quantization, and AR offloading disabled.')
         if self._model is not None:
             adapter.validate_model(self._model)
         self._lora, self._lora_strength = adapter, strength
@@ -313,6 +316,8 @@ class YuE2Pipeline:
     def plan(self, style=None, lyrics=None, *, tags=None, request=None, abc_sampling=None,
              cancelled=None, on_token=None, **kwargs):
         request = request or self._request(style, lyrics, tags=tags, **kwargs)
+        if self.lora_info and self.lora_info.get('kind')=='artist' and request.cot!='off':
+            raise ValueError('Artist LoRA requires No score mode.')
         if request.cot == "off":
             return SymbolicPlan(request, None, [], token_prefixes(request, self.tokenizer))
         if request.abc is not None:
@@ -336,7 +341,11 @@ class YuE2Pipeline:
             raise ValueError("Plan prefix disagrees with request/exact ABC IDs")
         sampling = resolve_sampling(sampling, self.generation_config.semantic)
         negative = negative_prefix(request, self.tokenizer, plan.abc_ids) if request.guidance != 1 else None
-        ids, timing, truncated = self._generate(plan.prefix, sampling, request.seed, "semantic",
+        adapter=getattr(self,'_lora',None)
+        artist=adapter is not None and adapter.info(self._lora_strength).get('kind')=='artist'
+        if artist and request.cot!='off':raise ValueError('Artist LoRA requires No score mode.')
+        with adapter.applied(self._load_model(),self._lora_strength) if artist else nullcontext():
+            ids, timing, truncated = self._generate(plan.prefix, sampling, request.seed, "semantic",
                         negative=negative, cfg_scale=request.guidance, legacy_off=request.cot == "off",
                         cancelled=cancelled, on_token=on_token)
         return SemanticResult(plan, [int(t) - CODEC_OFFSET for t in ids], timing, truncated)
@@ -356,7 +365,9 @@ class YuE2Pipeline:
             restore_ar(self._model)
         model = self._load_model(for_nar=True)
         adapter = getattr(self, "_lora", None)
-        context = adapter.applied(model,self._lora_strength) if adapter else nullcontext()
+        if adapter and adapter.info(self._lora_strength).get('kind')=='artist' and semantic.plan.request.cot!='off':
+            raise ValueError('Artist LoRA requires No score mode.')
+        context=(getattr(adapter,'synthesis_applied',adapter.applied)(model,self._lora_strength) if adapter else nullcontext())
         with context, self._status("Synthesizing audio", unit="steps") as status:
             report = (lambda completed, total: status.update(completed, total=total)) if self.progress else None
             result = synthesize(model, semantic.plan.prefix, semantic.tokens,
