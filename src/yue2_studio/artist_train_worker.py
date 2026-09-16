@@ -9,6 +9,18 @@ import sys
 import time
 
 
+def learning_rate_factor(step,steps,schedule):
+    """Warm up, then return a learning-rate multiplier in [0.2, 1.0]."""
+    if schedule=='legacy':
+        return min(1.,step/50)*(.2+.8*.5*(1+math.cos(math.pi*min(step,3000)/3000)))
+    if schedule!='auto':raise ValueError('Unknown Artist learning-rate schedule.')
+    if steps<=1:return 1.
+    warmup=min(50,max(1,steps//10))
+    if step<=warmup:return step/warmup
+    progress=min(1.,max(0.,(step-warmup)/(steps-warmup)))
+    return .2+.8*.5*(1+math.cos(math.pi*progress))
+
+
 def run(spec,directory):
     if spec.get('gpu_confirmed') is not True:raise ValueError('GPU preparation/training was not approved.')
     from .settings import ROOT
@@ -94,8 +106,9 @@ def run(spec,directory):
         print(f'[YuE2] Starting Artist LoRA training: 0/{steps} steps',flush=True)
         for step in range(1,steps+1):
             check_cancel(directory);optimizer.zero_grad(set_to_none=True)
-            factor=min(1.,step/50)*(.2+.8*.5*(1+math.cos(math.pi*min(step,3000)/3000)))
-            for group in optimizer.param_groups:group['lr']=controls['learning_rate']*factor
+            factor=learning_rate_factor(step,steps,controls.get('lr_schedule','legacy'))
+            current_lr=controls['learning_rate']*factor
+            for group in optimizer.param_groups:group['lr']=current_lr
             combined=0.
             for _ in range(2):
                 check_cancel(directory)
@@ -115,7 +128,7 @@ def run(spec,directory):
             last_step=step;last_loss=combined
             update_in_progress=False
             elapsed=time.monotonic()-start
-            print(f'[YuE2] Running Artist LoRA training: {step}/{steps} steps · loss {combined:.5f} · elapsed {elapsed:.0f}s · GPU allocated {torch.cuda.memory_allocated()/2**30:.2f} GiB / peak {torch.cuda.max_memory_allocated()/2**30:.2f} GiB',flush=True)
+            print(f'[YuE2] Running Artist LoRA training: {step}/{steps} steps · loss {combined:.5f} · LR {current_lr:.8f} · elapsed {elapsed:.0f}s · GPU allocated {torch.cuda.memory_allocated()/2**30:.2f} GiB / peak {torch.cuda.max_memory_allocated()/2**30:.2f} GiB',flush=True)
             if step%controls['checkpoint_every']==0:save(f'step-{step:06d}.safetensors',step)
             if step%100==0 or step==steps:
                 score=evaluate(step)
