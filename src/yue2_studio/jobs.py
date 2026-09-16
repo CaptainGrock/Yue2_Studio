@@ -52,6 +52,25 @@ def failure_summary(log, code):
     return errors[-1][:1200] if errors else f'Engine exited with code {code}. Open the run log for details.'
 
 
+def is_cuda_oom(log):
+    """Recognize Torch CUDA allocation failures without retrying unrelated errors."""
+    text = str(log).casefold()
+    return ('cuda out of memory' in text or 'torch.outofmemoryerror' in text or
+            ('cuda' in text and 'out of memory' in text))
+
+
+def oom_retry_spec(spec):
+    """Keep the song identical while selecting the safest compatible memory path."""
+    retry = deepcopy(spec)
+    runtime = retry['settings']['runtime']
+    artist = retry.get('lora',{}).get('kind') == 'artist'
+    can_offload = runtime.get('backend') in ('torch','torch-eager') and not artist
+    if can_offload:
+        runtime['offload_ar'] = True
+    return retry, {'reason':'cuda_oom','attempt':2,'offload_ar':bool(runtime.get('offload_ar')),
+                   'artist_lora':artist,'allocator':'expandable_segments'}
+
+
 def score_check(text, strip=False, keep_voice='both'):
     if not isinstance(text,str) or len(text)>500000:
         raise ValueError('ABC must be text under 500 KB.')
@@ -211,7 +230,10 @@ class JobManager:
                 job['log'] = handle.read().decode('utf-8','replace')
         else:
             job['log'] = 'Waiting for the GPU queue.'
-        if job['status']=='failed':
+        first_attempt = directory/'run.attempt-1.log'
+        if first_attempt.is_file():
+            job['attempt_logs'] = ['run.attempt-1.log']
+        if job['status']=='failed' and job.get('failure_kind')!='cuda_oom':
             job['error']=failure_summary(job['log'],1)
         from .progress import read_progress
         job['progress']=read_progress(job['log'],job['status'])
@@ -286,7 +308,7 @@ class JobManager:
             del self.jobs[job_id]
             return {'deleted':job_id,'title':job.get('title')}
 
-    def _command(self,job_id,spec):
+    def _command(self,job_id,spec,input_name='input.json'):
         directory = self.directory(job_id)
         if self.jobs[job_id]['kind']=='artist_setup':
             return [sys.executable,'-u','-m','yue2_studio.artist_setup_worker',str(directory/'input.json')]
@@ -297,7 +319,7 @@ class JobManager:
         if self.jobs[job_id]['kind']=='training':
             return [sys.executable,'-u','-m','yue2_studio.training_worker',str(directory/'input.json')]
         if self.jobs[job_id]['kind']=='generation':
-            return [sys.executable,'-u','-m','yue2_studio.worker',str(directory/'input.json')]
+            return [sys.executable,'-u','-m','yue2_studio.worker',str(directory/input_name)]
         opts = dict(spec['settings']['transcription'])
         command = [opts.pop('python'),'-u',str(SCRIPTS/'transcribe.py'),str(self.uploads/spec['upload_id']),'--output',str(directory/'result')]
         for name,value in opts.items():
@@ -339,6 +361,42 @@ class JobManager:
                     code = self.process.wait()
                 finally:
                     log.close()
+                # The failed worker has exited here, releasing its entire CUDA
+                # context. Retry one time without changing song or quality inputs.
+                if code and job['kind']=='generation' and job['status']=='running':
+                    failure_path = directory/'run.log'
+                    with failure_path.open('rb') as handle:
+                        handle.seek(max(0,failure_path.stat().st_size-40000))
+                        first_failure = handle.read().decode('utf-8','replace')
+                    if is_cuda_oom(first_failure):
+                        retry_spec, retry_info = oom_retry_spec(spec)
+                        with self.lock:
+                            if job['status']=='running':
+                                failure_path.replace(directory/'run.attempt-1.log')
+                                partial = directory/'result'
+                                if partial.exists():
+                                    shutil.rmtree(partial)
+                                write_json(directory/'retry-input.json',retry_spec)
+                                job['auto_retry'] = retry_info
+                                self._persist(job)
+                                retry_env = env.copy()
+                                retry_env.setdefault('PYTORCH_CUDA_ALLOC_CONF','expandable_segments:True')
+                                retry_command = self._command(job_id,retry_spec,'retry-input.json')
+                                retry_log = failure_path.open('w',encoding='utf-8')
+                                try:
+                                    self.process = subprocess.Popen(retry_command,cwd=ROOT,env=retry_env,
+                                        stdout=retry_log,stderr=subprocess.STDOUT,
+                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+                                except BaseException:
+                                    retry_log.close()
+                                    raise
+                            else:
+                                retry_log = None
+                        if retry_log is not None:
+                            try:
+                                code = self.process.wait()
+                            finally:
+                                retry_log.close()
                 with self.lock:
                     if job['status']=='cancelling':
                         job['status']='cancelled'
@@ -347,8 +405,18 @@ class JobManager:
                             handle.seek(max(0,(directory/'run.log').stat().st_size-40000))
                             failure_log=handle.read().decode('utf-8','replace')
                         job.update(status='failed',error=failure_summary(failure_log,code))
+                        if job.get('auto_retry'):
+                            job['auto_retry']['exhausted'] = True
+                            if is_cuda_oom(failure_log):
+                                job['failure_kind'] = 'cuda_oom'
+                                job['error'] = ('GPU memory ran out again after Yue2 automatically retried in a fresh process. '
+                                    'The song may be too long for the available VRAM. Close other GPU tasks and try again.')
                     else:
                         job['status']='complete'
+                        if job.get('auto_retry'):
+                            job['auto_retry']['succeeded'] = True
+                            job['warning'] = ('Recovered automatically after a CUDA out-of-memory error using a fresh GPU process'
+                                + (' with AR offloading.' if job['auto_retry']['offload_ar'] else '.'))
                         manifest = directory/'result/transcription_manifest.json'
                         if manifest.exists():
                             warnings = json.loads(manifest.read_text(encoding='utf-8')).get('warnings',[])

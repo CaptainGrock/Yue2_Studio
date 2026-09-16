@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const clone = value => JSON.parse(JSON.stringify(value));
 const state = {boot:null,settings:{},mode:'create',upload:null,sourceJob:'',jobs:[],view:'create',activeId:null,runId:null,connection:{provider:'openai',model:'',max_tokens:4096,timeout:360,context_length:32768,temperature:null},connections:{},draft:null,settingsSnapshot:null};
 let saveTimer,toastTimer,polling=false,modelEpoch=0,restoreCallback=null;
+const oomNotified=new Set();
 const ICON = name => {const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');const use=document.createElementNS(svg.namespaceURI,'use');use.setAttribute('href','#i-'+name);svg.append(use);return svg;};
 const THEME_KEY='yue2-studio-theme-v1';
 const THEMES={
@@ -39,6 +40,17 @@ function toast(text,error=false){clearTimeout(toastTimer);$('toast').hidden=fals
 async function api(path,data,options={}){const response=await fetch(path,{...options,method:data===undefined?'GET':'POST',headers:data===undefined?{}:{'Content-Type':'application/json','X-Studio-Token':state.boot?.token||''},body:data===undefined?undefined:JSON.stringify(data)});const body=await response.json();if(!response.ok)throw new Error(body.error||'Request failed.');return body;}
 async function busy(id,fn,label='Working…'){const el=$(id),original=[...el.childNodes];el.disabled=true;el.textContent=label;try{return await fn();}catch(error){toast(error.message,true);return null;}finally{el.disabled=false;el.replaceChildren(...original);}}
 function feedbackError(error){toast(error.message,true);}
+function showOomFailure(job){
+  if(!job||oomNotified.has(job.id)||$('oomDialog').open)return;
+  oomNotified.add(job.id);
+  $('oomText').textContent=job.auto_retry?.artist_lora
+    ?'The automatic retry also ran out of GPU memory. Artist LoRA must keep AR offloading disabled. The song may be too long for the available VRAM. Close other applications using the GPU and try again.'
+    :'The automatic retry also ran out of GPU memory. The song may be too long for the available VRAM. Check for background applications using the GPU, close them, and try again.';
+  $('oomOpenRun').onclick=()=>{$('oomDialog').close();openRun(job.id);};
+  $('oomDialog').showModal();
+}
+function checkOomFailures(){showOomFailure(state.jobs.find(job=>job.status==='failed'&&job.failure_kind==='cuda_oom'&&job.auto_retry?.exhausted&&!oomNotified.has(job.id)));}
+window.addEventListener('load',()=>{$('oomClose').onclick=()=>$('oomDialog').close();setInterval(checkOomFailures,1000);});
 function download(name,data,type='application/json'){const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function projectData(){return {version:1,surprise:{lock_style:$('surpriseLockStyle').checked,profanity:$('surpriseProfanity').value,count:$('surpriseCount').value,voice:$('surpriseVoice').value,style:$('surpriseStyle').value,language:$('surpriseLanguage').value},title:$('songTitle').value,style:$('style').value,lyrics:$('lyrics').value,abc:$('abc').value,mode:state.mode,cot:$('planMode').value,seed:$('seed').value,settings:clone(state.settings),brief:$('brief').value,action:$('assistAction').value,instructions:$('writingInstructions').value,upload:state.upload,source_job:state.sourceJob,connection:publicConnection(state.connection)};}
 function publicConnection(value){return Object.fromEntries(['provider','model','base_url','max_tokens','timeout','context_length','temperature'].filter(k=>value[k]!==undefined).map(k=>[k,value[k]]));}

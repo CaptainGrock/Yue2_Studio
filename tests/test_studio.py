@@ -18,7 +18,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from yue2.protocol import GenerationConfig,Sampling
 from yue2_studio.settings import defaults,validate_settings
-from yue2_studio.jobs import JobManager,generation_spec,score_check
+from yue2_studio.jobs import JobManager,generation_spec,is_cuda_oom,oom_retry_spec,score_check
 from yue2_studio.server import StudioServer
 from yue2_studio import llm
 
@@ -188,6 +188,71 @@ class LLMTests(unittest.TestCase):
 
 
 class QueueTests(unittest.TestCase):
+    def test_oom_retry_memory_policy_preserves_song(self):
+        spec=generation_spec(payload());original=deepcopy(spec)
+        retry,info=oom_retry_spec(spec)
+        self.assertEqual(retry['request'],original['request'])
+        self.assertEqual(spec,original)
+        self.assertTrue(retry['settings']['runtime']['offload_ar'])
+        self.assertTrue(info['offload_ar'])
+        artist=deepcopy(spec);artist['lora']={'kind':'artist'}
+        artist_retry,artist_info=oom_retry_spec(artist)
+        self.assertFalse(artist_retry['settings']['runtime']['offload_ar'])
+        self.assertTrue(artist_info['artist_lora'])
+        self.assertTrue(is_cuda_oom('torch.OutOfMemoryError: CUDA out of memory'))
+        self.assertFalse(is_cuda_oom('ValueError: bad score'))
+
+    def test_generation_oom_retries_once_in_fresh_process(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager=JobManager(tmp,start=False);job=manager.generate(payload());calls=[]
+            original=(manager.directory(job['id'])/'input.json').read_bytes()
+            class Process:
+                def __init__(self,command,**kwargs):
+                    self.number=len(calls)+1;calls.append((command,kwargs['env']))
+                    kwargs['stdout'].write('torch.OutOfMemoryError: CUDA out of memory\n' if self.number==1 else 'Studio: artifacts saved.\n')
+                    kwargs['stdout'].flush()
+                    if self.number==1:
+                        result=Path(command[-1]).parent/'result';result.mkdir();(result/'partial.tmp').write_text('incomplete')
+                def wait(self):return 1 if self.number==1 else 0
+                def poll(self):return 1 if self.number==1 else 0
+            with patch('yue2_studio.jobs.subprocess.Popen',Process):
+                manager.thread.start();manager.queue.join();manager.close()
+            saved=manager.jobs[job['id']]
+            retry=json.loads((manager.directory(job['id'])/'retry-input.json').read_text())
+            self.assertEqual(len(calls),2)
+            self.assertEqual(saved['status'],'complete')
+            self.assertTrue(saved['auto_retry']['succeeded'])
+            self.assertTrue(retry['settings']['runtime']['offload_ar'])
+            self.assertEqual(retry['request'],json.loads(original)['request'])
+            self.assertEqual((manager.directory(job['id'])/'input.json').read_bytes(),original)
+            self.assertTrue((manager.directory(job['id'])/'run.attempt-1.log').is_file())
+            self.assertEqual(calls[1][1]['PYTORCH_CUDA_ALLOC_CONF'],'expandable_segments:True')
+
+    def test_second_generation_oom_is_classified_for_popup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager=JobManager(tmp,start=False);job=manager.generate(payload());calls=[]
+            class Process:
+                def __init__(self,command,**kwargs):
+                    calls.append(command);kwargs['stdout'].write('torch.OutOfMemoryError: CUDA out of memory\n');kwargs['stdout'].flush()
+                def wait(self):return 1
+                def poll(self):return 1
+            with patch('yue2_studio.jobs.subprocess.Popen',Process):
+                manager.thread.start();manager.queue.join();manager.close()
+            saved=manager.jobs[job['id']]
+            self.assertEqual(len(calls),2)
+            self.assertEqual(saved['status'],'failed')
+            self.assertEqual(saved['failure_kind'],'cuda_oom')
+            self.assertTrue(saved['auto_retry']['exhausted'])
+            self.assertIn('automatically retried',saved['error'])
+            self.assertIn('automatically retried',manager.detail(job['id'])['error'])
+
+    def test_oom_popup_contract_is_present(self):
+        index=(ROOT/'src/yue2_studio/static/index.html').read_text()
+        script=(ROOT/'src/yue2_studio/static/app.js').read_text()
+        self.assertIn('id="oomDialog"',index)
+        self.assertIn("job.failure_kind==='cuda_oom'",script)
+        self.assertIn('Artist LoRA must keep AR offloading disabled',script)
+
     def test_serial_execution_and_cancelled_queue_item(self):
         with tempfile.TemporaryDirectory() as tmp:
             manager=JobManager(tmp,start=False)
