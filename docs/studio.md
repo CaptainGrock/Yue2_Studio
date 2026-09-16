@@ -90,6 +90,58 @@ There is no supported exact-duration setting. Sampling maxima cap tokens, and th
 instead of calling a capped result a complete musical performance. All default sampling values and
 32 midpoint synthesis steps are preserved.
 
+### Automatic out-of-memory retry
+
+If a song render fails with a CUDA out-of-memory error, Studio automatically retries it once in a
+fresh worker process. The retry enables PyTorch expandable allocator segments and, for normal Torch
+generation, enables AR offloading so the autoregressive model is released before synthesis. Artist
+LoRA generation keeps AR offloading disabled because Artist adapters require that setting.
+
+The Library run remains one run: `run.attempt-1.log` retains the first failure, `run.log` shows the
+retry, and the run displays a warning when recovery succeeds. Studio does not shorten the song or
+change its lyrics, score, sampling, or model. If the fresh retry also runs out of memory, Studio shows
+a GPU-memory dialog. Close other GPU applications and try again; a long or unusually complex song
+may exceed the available VRAM.
+
+## Train and use LoRAs
+
+**Style trainer** learns acoustic production from consecutive clips. **Artist Trainer** is a separate,
+experimental whole-song workflow that uses matching lyric sidecars, a shared style, and the song
+generation branch. Save and review an Artist setup before queuing training. Completed adapters appear
+in Create music under **Style / Artist LoRA**.
+
+Artist training steps accept any positive whole number; there is no artificial 1,600-step ceiling.
+Longer runs take proportionally longer and can overfit, so periodic checkpoints should be auditioned.
+The recommended **Auto · match training steps** schedule scales warmup and decay to the requested run
+length. **Legacy · fixed 3,000-step curve** remains available for reproducing older runs.
+
+With a positive lyric-alignment weight, choose MMS or experimental Whisper-assisted timing. Whisper
+separates vocals, recognizes acoustic word times, matches them to the supplied lyrics, and saves review
+JSON. Preparation is cached under `training/artist-cache`. Reusing the same audio, lyrics, alignment
+method, encoder/model identities, and preparation recipe skips repeated encoding, separation, and
+Whisper/MMS work; changing only steps or the learning-rate schedule does not invalidate that cache.
+If an earlier preparation stopped before the cache was committed, the missing work runs again. Setting
+alignment weight to `0` skips lyric-timing preparation and loss, but the full lyrics still condition
+training. See the [Artist Trainer guide](artist-trainer.md) for setup, constraints, and artifacts.
+
+Artist LoRAs require Torch or Torch-eager, quantization None, No score mode, and AR offloading disabled.
+Only one Style or Artist adapter can be selected at once. Automatic trigger insertion can add the saved
+trigger phrase; keep the shared training style in the Style field. This experimental feature does not
+guarantee voice identity or grant permission to imitate or publish another person's voice.
+
+## Publish a song to Audius
+
+The app maintainer configures one Audius developer application, sets `YUE2_AUDIUS_API_KEY` before
+launching Studio, and registers the exact callback URL (normally `http://localhost:7862/`). Individual
+users do **not** create developer apps or enter API keys. They need only an Audius account: open
+**Connected platforms**, choose **Connect Audius**, sign in or create an account, and approve write access.
+
+For a completed song in the Library, confirm that you hold the necessary rights and select
+**Upload to Audius**. When Audius accepts and indexes the track, the button becomes **Open on Audius**.
+The account password is handled by Audius OAuth and is never given to Yue2. AI-generated music is not
+automatically exempt from copyright, voice, sample, or platform rules. Setup and troubleshooting are in
+the [Audius publishing guide](audius.md).
+
 ## Surprise me and automatic batches
 
 For LoRA selection, training-style autofill and the style lock, see
@@ -418,6 +470,10 @@ Provider adapters use the following official interfaces:
 ### Failed runs and logs
 
 Open a song in the library to see its error, live engine log, full log path, and Download log button. Logs are saved in `runs/studio/<run-id>/run.log`; launcher logs are `runs/studio/server.log` and `server-error.log`. Failed, cancelled, or interrupted music runs offer **Retry saved song**, which queues a fresh run with the saved lyrics, style, seed, and settings without calling the writing LLM again.
+
+CUDA out-of-memory failures receive one automatic fresh-process retry first, as described above. If it
+also fails, the manual **Retry saved song** action still uses the original saved settings; adjust the
+editor/runtime settings and start a new song if you want different memory options.
 
 The worker checks whether the installed PyTorch build supports Flash Attention. If an optimized `torch` CUDA request cannot work on that build, it retains `torch` CUDA graphs and selects cuDNN attention when supported (otherwise SDPA), recording the compatibility decision in `runtime_adjustments.json` and the engine log. Song length, sampling, and synthesis controls remain unchanged. This also handles older saved projects.
 

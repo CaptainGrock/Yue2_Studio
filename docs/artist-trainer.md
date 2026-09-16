@@ -78,6 +78,15 @@ Demucs/MMS weights; Whisper-assisted timing downloads fine-tuned Demucs and
 Whisper large-v3 weights. Preparation can take longer than a short training run and
 happens before optimizer steps. Confidence and loss are not quality scores.
 
+Prepared songs are hash-cached under `training/artist-cache`. If the audio bytes,
+lyrics, alignment method, encoder/model identities and preparation recipe are the
+same, a later run reuses the cache and skips MERT encoding, vocal separation and
+Whisper/MMS timing. Changing only the training steps, rank, learning rate, schedule
+or checkpoint interval does not invalidate preparation. A changed song or lyric
+file, another timing method, a preparation-version change, deleted/corrupt cache,
+or a run that stopped before committing its cache causes the affected work to run
+again. A fast jump to `Artist encoding: N/N` and training confirms cache reuse.
+
 ### Choose MMS or Whisper-assisted timing
 
 Both methods use the complete original song for semantic encoding and the full
@@ -188,8 +197,10 @@ alone is not evidence of singer learning.
 - **Missing lyrics:** check the filename suffix and audio stem. Zero alignment
   weight does not make lyric files optional.
 - **OOM:** free competing GPU workloads and review the failed log and training
-  controls. Generation memory presets do not tune this trainer; saved adapter
-  checkpoints do not provide exact resume.
+  controls. The one-time automatic OOM retry is for song generation, including
+  Artist LoRA playback; it does not restart Artist training. Generation memory
+  presets do not tune this trainer, and saved adapter checkpoints do not provide
+  exact resume.
 - **Abrupt generation ending:** inspect token-limit/truncation warnings. Training
   steps and save frequency do not control generated song length.
 

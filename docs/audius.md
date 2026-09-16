@@ -23,6 +23,10 @@ $env:YUE2_AUDIUS_API_KEY="your-public-api-key"
 python launch_studio.py
 ```
 
+Set this key once for the Studio application; do not ask each user to enter it.
+The `"User"` argument above means the Windows user-level environment-variable
+scope—it is not an Audius username and should not be replaced with one.
+
 Audius documents this API key as safe for frontend use; it is an OAuth client identifier and is visible in browser requests. **Never put the Audius bearer token in Studio, Git, browser code, or release files.**
 
 ## User workflow
@@ -36,6 +40,21 @@ Audius documents this API key as safe for frontend use; it is an OAuth client id
 Studio uploads the lossless FLAC, creates the Audius track, and records the returned track ID and safe public page URL in browser-local storage. Project exports and run artifacts do not contain OAuth tokens.
 
 Only public `https://audius.co/...` links are opened. Audius storage-node and CDN URLs are deliberately rejected so a browser or security product is never directed to raw storage infrastructure.
+
+Audius authorization may open a popup or another browser tab and then return to
+the local Studio callback. Keep the original Studio tab open during that flow.
+
+## Troubleshooting
+
+- **Audius is not configured:** set `YUE2_AUDIUS_API_KEY`, fully stop Studio, and relaunch it.
+- **Redirect or login loops:** make sure the registered callback exactly matches the callback shown in
+  Connected platforms, including `http`, host, port, and trailing slash. `localhost` and `127.0.0.1`
+  are different OAuth origins unless both are registered.
+- **Open on Audius is temporarily unavailable:** the track may still be indexing. Open your Audius
+  profile and check its uploads after a short wait. Studio accepts only a public `audius.co` page URL.
+- **Security software reports a blocked content/CDN URL:** do not bypass it blindly. Update security
+  definitions, verify the hostname independently, and report a persistent false positive to Audius and
+  the security vendor. Studio should never open a raw storage or CDN URL as the public-track action.
 
 ## Rights and AI-generated music
 

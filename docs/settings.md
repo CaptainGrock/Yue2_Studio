@@ -151,7 +151,11 @@ Runs in the separate SheetSage2 environment, one GPU job at a time.
 
 **Missing model:** correct model paths or use Hub IDs and disable offline loading for downloads.
 
-**CUDA out of memory:** load the failed request, enable Offload autoregressive model, apply and Generate song. Retry saved song reuses its old settings. Close other GPU workloads if needed.
+**CUDA out of memory:** song generation automatically retries once in a fresh process with expandable
+allocator segments. Normal Torch generation also enables **Offload autoregressive model** for that retry;
+Artist LoRA generation cannot use AR offloading. If the second attempt fails, close other GPU workloads,
+load the failed request, shorten or simplify the song if appropriate, and generate a new run. **Retry saved
+song** reuses the old settings.
 
 **Missing Flash Attention:** this package retains CUDA graphs and uses supported cuDNN/SDPA attention. Reinstall the overlay if upstream updates replaced cuda_graph.py.
 
