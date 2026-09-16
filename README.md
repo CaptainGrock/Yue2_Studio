@@ -185,6 +185,7 @@ Your runs stay under the parent `runs/studio/`; keys are entered per browser ses
 ## Documentation
 
 - [Full workflow guide](docs/studio.md)
+- [Audius publishing setup](docs/audius.md)
 - [Every advanced setting, defaults, performance and troubleshooting](docs/settings.md)
 - [Style Trainer](docs/trainer.md) · [Artist Trainer](docs/artist-trainer.md) · [LoRA playback](docs/lora.md)
 - [Official YuE2 music skill and formatting](https://github.com/multimodal-art-projection/YuE/tree/main/skills/yue2-music)

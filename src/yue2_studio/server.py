@@ -28,6 +28,12 @@ from .model_manager import ModelManager
 STATIC = Path(__file__).parent/'static'
 
 
+def audius_config():
+    """Return public browser OAuth configuration; never include the bearer token."""
+    client_id = os.environ.get('YUE2_AUDIUS_API_KEY','').strip()
+    return {'enabled':bool(client_id),'client_id':client_id}
+
+
 def _unsupported_json(value):
     raise TypeError(f'Cannot encode {type(value).__name__}')
 
@@ -79,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Referrer-Policy','no-referrer')
         self.send_header('Cache-Control','no-store')
-        self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://api.audius.co https://*.audius.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         super().end_headers()
 
     def json(self,data,status=200):
@@ -122,6 +128,8 @@ class Handler(BaseHTTPRequestHandler):
             elif path=='/api/bootstrap':
                 self.json({'token':self.server.token,'groups':GROUPS,'fixed':FIXED,'defaults':defaults(),
                     'providers':llm.catalogue(),'songwriter_prompt':llm.PROMPT,'compatibility':capabilities(),'profanity_check':True,'surprise_style_lock':True,'browser_autoclose':True,
+                    # Audius documents its API key as a public OAuth client identifier. Never expose the bearer token here.
+                    'audius':audius_config(),
                     'paths':{'root':str(ROOT),'runs':str(self.server.jobs.root)},
                     'installed':{name:(ROOT/'models'/name).is_dir() for name in ('YuE2-3B','YuE2-Vae','SheetSage2','MERT-v2-FullSong')}})
             elif path=='/api/models':
@@ -165,7 +173,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
-            elif path in ('/','/index.html','/app.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/audius.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)

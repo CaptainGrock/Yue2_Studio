@@ -1,7 +1,8 @@
 # YuE2 Studio · Beta
 
 A local HTML/CSS/JavaScript music studio backed by the installed Python engines. No Gradio,
-Node build or CDN is needed. Normal Studio uses the existing YuE2 environment;
+No Node build is needed. Normal Studio uses the existing YuE2 environment;
+the optional Audius publishing feature loads its pinned browser SDK from jsDelivr;
 Artist Trainer requires its own explicitly installed runtime.
 
 This guide covers the current controls. Screenshots include the author's workspace:
