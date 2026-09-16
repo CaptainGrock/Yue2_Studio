@@ -52,9 +52,6 @@ the local Studio callback. Keep the original Studio tab open during that flow.
   are different OAuth origins unless both are registered.
 - **Open on Audius is temporarily unavailable:** the track may still be indexing. Open your Audius
   profile and check its uploads after a short wait. Studio accepts only a public `audius.co` page URL.
-- **Security software reports a blocked content/CDN URL:** do not bypass it blindly. Update security
-  definitions, verify the hostname independently, and report a persistent false positive to Audius and
-  the security vendor. Studio should never open a raw storage or CDN URL as the public-track action.
 
 ## Rights and AI-generated music
 
