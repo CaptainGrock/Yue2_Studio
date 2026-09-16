@@ -25,14 +25,18 @@ def validate_project(project):
 
 
 def training_spec(payload):
-    allowed={'project_id','steps','rank','learning_rate','checkpoint_every','alignment_weight','alignment_method','gpu_confirmed'}
+    allowed={'project_id','steps','rank','learning_rate','lr_schedule','checkpoint_every','alignment_weight','alignment_method','gpu_confirmed'}
     if set(payload)-allowed:raise ValueError('Unknown artist training controls.')
     if payload.get('gpu_confirmed') is not True:
         raise ValueError('Confirm GPU preparation and training before queueing.')
     project=artist_trainer.load_project(str(payload.get('project_id','')))
     selected=validate_project(project)
     controls={}
-    for key,default,lo,hi in [('steps',500,1,1600),('rank',64,8,64),('checkpoint_every',250,1,400)]:
+    steps=payload.get('steps',800)
+    if type(steps) is not int or steps<1:
+        raise ValueError('steps must be a positive integer.')
+    controls['steps']=steps
+    for key,default,lo,hi in [('rank',64,8,64),('checkpoint_every',200,1,400)]:
         value=payload.get(key,default)
         if type(value) is not int or not lo<=value<=hi:raise ValueError(f'{key} must be an integer from {lo} to {hi}.')
         controls[key]=value
@@ -40,6 +44,10 @@ def training_spec(payload):
         value=payload.get(key,default)
         if type(value) not in (int,float) or not math.isfinite(value) or not lo<=value<=hi:raise ValueError('Invalid '+key)
         controls[key]=value
+    schedule=payload.get('lr_schedule','auto')
+    if type(schedule) is not str or schedule not in ('auto','legacy'):
+        raise ValueError('Choose automatic or legacy learning-rate scheduling.')
+    controls['lr_schedule']=schedule
     method=payload.get('alignment_method','mms')
     if type(method) is not str or method not in ('mms','whisper'):
         raise ValueError('Choose MMS or Whisper-assisted lyric timing.')

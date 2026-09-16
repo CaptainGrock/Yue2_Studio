@@ -11,7 +11,7 @@ from yue2.modeling_yue2 import YuE2Config,YuE2ForCausalLM
 from yue2_studio import artist_ar as ar,artist_training as training
 from yue2_studio.artist_prepare import words_of
 from yue2_studio.artist_whisper import match_lyrics
-from yue2_studio.artist_train_worker import run
+from yue2_studio.artist_train_worker import learning_rate_factor,run
 from yue2_studio.jobs import JobManager
 
 
@@ -175,16 +175,30 @@ def test_validation_controls_and_holdout(tmp_path,monkeypatch):
     valid={'project_id':project['id'],'gpu_confirmed':True}
     spec=training.training_spec(valid)
     assert spec['python']=='custom/python.exe' and spec['paths']=={'model':'custom-model'}
-    assert spec['holdout']=='b' and spec['controls']['steps']==500
-    assert spec['controls']['checkpoint_every']==250
+    assert spec['holdout']=='b' and spec['controls']['steps']==800
+    assert spec['controls']['checkpoint_every']==200
+    assert spec['controls']['lr_schedule']=='auto'
     assert spec['controls']['alignment_method']=='mms'
     assert training.training_spec(dict(valid,alignment_method='whisper'))['controls']['alignment_method']=='whisper'
-    explicit=training.training_spec(dict(valid,steps=800,checkpoint_every=200))
-    assert explicit['controls']['steps']==800 and explicit['controls']['checkpoint_every']==200
-    for key,value in [('steps',True),('steps',1601),('rank',0),('alignment_weight',float('nan')),('learning_rate',1),('python','bad')]:
+    assert training.training_spec(dict(valid,lr_schedule='legacy'))['controls']['lr_schedule']=='legacy'
+    explicit=training.training_spec(dict(valid,steps=5000,checkpoint_every=200))
+    assert explicit['controls']['steps']==5000 and explicit['controls']['checkpoint_every']==200
+    for key,value in [('steps',True),('steps',0),('steps',-1),('rank',0),('alignment_weight',float('nan')),('learning_rate',1),('python','bad')]:
         with pytest.raises(ValueError):training.training_spec(dict(valid,**{key:value}))
     with pytest.raises(ValueError,match='MMS or Whisper'):
         training.training_spec(dict(valid,alignment_method='other'))
+    with pytest.raises(ValueError,match='automatic or legacy'):
+        training.training_spec(dict(valid,lr_schedule='other'))
+
+
+def test_artist_learning_rate_schedules_match_requested_steps():
+    assert learning_rate_factor(50,800,'auto')==pytest.approx(1.)
+    assert learning_rate_factor(800,800,'auto')==pytest.approx(.2)
+    assert learning_rate_factor(5000,5000,'auto')==pytest.approx(.2)
+    assert learning_rate_factor(400,800,'auto')<learning_rate_factor(400,800,'legacy')
+    assert learning_rate_factor(1,1,'auto')==pytest.approx(1.)
+    with pytest.raises(ValueError,match='Unknown Artist'):
+        learning_rate_factor(1,800,'other')
 
 
 def test_runtime_shows_historical_gpu_verification(tmp_path,monkeypatch):

@@ -20,17 +20,21 @@ context.bindArtistSetup=()=>{};
 (async()=>{
   vm.runInContext('bindArtistTrainer()',context);
   el('artistProjects').value='saved';el('artistGpuConfirmed').checked=true;
-  for(const [id,value] of [['artistSteps','20'],['artistRank','64'],['artistLearningRate','0.0001'],
-    ['artistCheckpoint','20'],['artistAlignment','0.08'],['artistAlignmentMethod','whisper']])el(id).value=value;
+  for(const [id,value] of [['artistSteps','2000'],['artistRank','64'],['artistLearningRate','0.0001'],
+    ['artistLrSchedule','auto'],['artistCheckpoint','20'],['artistAlignment','0.08'],['artistAlignmentMethod','whisper']])el(id).value=value;
   el('artistTrain').onclick();
   await new Promise(resolve=>setImmediate(resolve));
   const queued=calls.find(call=>call.url==='/api/artist-trainer/train');
   assert.equal(queued.payload.alignment_method,'whisper');
+  assert.equal(queued.payload.steps,2000);
+  assert.equal(queued.payload.lr_schedule,'auto');
   assert.equal(queued.payload.project_id,'saved');
   assert.equal(el('artistGpuConfirmed').checked,false);
   const html=fs.readFileSync('src/yue2_studio/static/index.html','utf8');
   assert.match(html,/id="artistAlignmentMethod"/);
   assert.match(html,/<option value="mms">/);
   assert.match(html,/<option value="whisper">/);
+  assert.match(html,/id="artistSteps"[^>]*min="1"(?![^>]*max=)/);
+  assert.match(html,/id="artistLrSchedule"/);
   console.log('Artist Whisper dropdown and payload passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

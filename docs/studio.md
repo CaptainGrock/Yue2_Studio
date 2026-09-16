@@ -215,7 +215,7 @@ with Artist below Style. Both are experimental; neither promises a cloned singer
 | --- | --- | --- |
 | Input | Songs and one shared style; no lyric sidecars | At least two complete 30–360 second songs with matching full lyrics, plus shared style and trigger |
 | Training approach | Acoustic/NAR adapter, shuffled audio clips | AR adapter, full-song semantic sequences, optional English lyric alignment |
-| Starting defaults | 2,000 steps; save every 500 | 500 steps; save every 250 |
+| Starting defaults | 2,000 steps; save every 500 | 800 steps; save every 200; automatic schedule matched to the requested steps |
 | Extra setup | Full PyTorch YuE2 + VAE | Separate runtime, full models, MERT, community encoder/companion and reference pack |
 | Playback | Python engine; not GGUF | No score, Torch/Torch-eager, quantization None, AR offloading off |
 

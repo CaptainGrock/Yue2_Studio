@@ -47,22 +47,30 @@ models, a separate runtime, caches and adapter checkpoints. See [setup details](
 
 ![Artist training controls with example values](../images/artist-trainer-controls.png)
 
-The screenshot shows older **800 / 200** values and predates the lyric-timing
-method selector; current defaults are **500 / 250**.
+The screenshot predates the lyric-timing method and learning-rate schedule
+selectors; current defaults remain **800 / 200**.
 
 | Control | Default | Meaning |
 | --- | --- | --- |
-| Training steps | 500 | Optimizer updates; two song examples per update, not two full dataset passes |
-| Save checkpoint every | 250 | Intermediate adapter snapshots for comparison |
+| Training steps | 800 | Optimizer updates; two song examples per update, not two full dataset passes; no artificial maximum |
+| Save checkpoint every | 200 | Intermediate adapter snapshots for comparison |
 | Rank | 64 | Adapter capacity; higher can use more memory/storage without better results |
 | Learning rate | 0.0001 | Update size; overly aggressive learning can degrade results |
+| Learning-rate schedule | Auto | Matches warmup and cosine decay to the requested number of steps |
 | Lyric timing method | MMS | Choose the original forced aligner or experimental Whisper-assisted timing |
 | Alignment weight | 0.08 | English lyric-timing supervision; 0 skips separation/alignment, not lyrics |
 
 Click the information disclosures for supported ranges and tradeoffs. These are
-starting values, not a guarantee that 500 steps is best. Artist uses complete songs,
+starting values, not a guarantee that 800 steps—or a longer uncapped run—is best. Artist uses complete songs,
 not the Style Trainer clip-length setting. Generation GPU presets do not automatically
 tune training speed, memory use or batch size.
+
+The default **Auto · match training steps** schedule reaches the peak learning rate
+after warmup and gradually decays to 20% at the final requested step. This removes
+the old reason for a 1,600-step ceiling, but it does not make very long runs inherently
+better: they take proportionally longer and may overfit. **Legacy** retains the fixed
+3,000-step curve for reproduction. Older queued inputs without a schedule also use
+Legacy behavior.
 
 Open **Song library → Open run** for encoding, vocal separation, lyric alignment,
 validation, steps, loss and checkpoint artifacts. First-use MMS alignment downloads
