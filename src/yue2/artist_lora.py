@@ -55,7 +55,8 @@ class ArtistLoRA(AcousticLoRA):
     def info(self,strength):
         return {**super().info(strength),'kind':'artist','companion_path':self.companion_path,
                 'companion_sha256':self.metadata['companion_sha256'],'base_identity':self.base_identity,
-                'conditioning':'cot-off','companion_strength':1. if strength!=0 else 0.}
+                'conditioning':'cot-off','companion_strength':1. if strength!=0 else 0.,
+                'base_model':self.metadata.get('base_model')}
 
     def validate_model(self,model):
         from yue2_studio.artist_encoder import check_nar

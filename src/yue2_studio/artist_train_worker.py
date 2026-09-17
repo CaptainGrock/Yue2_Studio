@@ -68,7 +68,8 @@ def run(spec,directory):
     optimizer=torch.optim.AdamW(parameters,lr=controls['learning_rate'],betas=(.9,.95),weight_decay=0.)
     metadata={'rank':str(controls['rank']),'trigger_word':project['trigger'],'training_style':project['shared_style'],'project_id':project['id'],
               'encoder_revision':REVISION,'companion_sha256':HASHES['nar_lora_joint_v4.pt'],
-              'conditioning':'cot-off','targets':'ar-attention-and-mlp','seed':'42'}
+              'conditioning':'cot-off','targets':'ar-attention-and-mlp','seed':'42',
+              'base_model':str(paths['model'])}
     write_json(result/'manifest.json',dict(format='yue2-artist-ar-v1',base=base_identity,controls=controls,
                companion=dict(path=str(paths['encoder']/'nar_lora_joint_v4.pt'),sha256=HASHES['nar_lora_joint_v4.pt']),
                metadata=metadata,holdout=spec['holdout'],inference_integration='artist-bundle-v1',resume_supported=False,
