@@ -35,11 +35,11 @@ def run(path):
             if info['sha256'] != spec.get('lora',{}).get('sha256'):
                 raise ValueError('LoRA file changed after this song was queued; no audio was generated.')
             if info.get('kind')=='artist':
-                from .training_worker import model_identity
+                from .artist_identity import validate_base
                 if info['companion_sha256']!=spec['lora'].get('companion_sha256') or info['base_identity']!=spec['lora'].get('base_identity'):
                     raise ValueError('Artist bundle identity changed after queueing.')
-                if model_identity(pipe.model_dir,Path(path).parent)!=info['base_identity']:
-                    raise ValueError('Artist LoRA was trained against different base-model files.')
+                validate_base(pipe.model_dir, info['base_identity'], Path(path).parent,
+                              info.get('base_model'))
                 if spec['request'].get('cot')!='off':raise ValueError('Artist LoRA requires No score mode.')
                 print('Artist AR adapter + pinned NAR companion selected; no score mode.',flush=True)
             print('Studio LoRA: '+Path(info['path']).name+' · strength '+str(info['strength']), flush=True)

@@ -119,6 +119,37 @@ def test_changed_file_fails_retry_and_worker_before_render(adapter, tmp_path):
     pipe.assert_not_called()
 
 
+@pytest.mark.parametrize('changed_weights', [False, True])
+def test_artist_worker_checks_weights_but_allows_sidecar_changes(adapter, tmp_path, changed_weights):
+    from yue2_studio.training_worker import model_identity
+    model = tmp_path / 'base'
+    model.mkdir()
+    for name in ('model.safetensors', 'config.json', 'qwen.tiktoken', 'generation_config.json'):
+        (model / name).write_bytes(name.encode())
+    identity = model_identity(model, tmp_path)
+    (model / 'generation_config.json').write_text('{}')
+    if changed_weights:
+        (model / 'model.safetensors').write_bytes(b'different')
+    spec = generation_spec(payload(adapter))
+    spec['request']['cot'] = 'off'
+    spec['lora'].update(kind='artist', base_identity=identity, companion_sha256='companion')
+    path = tmp_path / 'input.json'
+    path.write_text(json.dumps(spec), encoding='utf-8')
+    factory = MagicMock()
+    pipe = factory.return_value.__enter__.return_value
+    pipe.model_dir = model
+    pipe.load_lora.return_value = spec['lora']
+    with patch('yue2.YuE2Pipeline.from_pretrained', factory), patch(
+            'yue2_studio.worker.capabilities', return_value={'flash_attention': True}):
+        if changed_weights:
+            with pytest.raises(ValueError, match='model.safetensors'):
+                run(path)
+            pipe.assert_not_called()
+        else:
+            run(path)
+            pipe.assert_called_once_with(**spec['request'])
+
+
 def test_http_catalogue_inspection_and_static_controls(adapter, tmp_path, monkeypatch):
     from yue2_studio.server import StudioServer
     monkeypatch.setattr(loras, 'ROOT', tmp_path)
