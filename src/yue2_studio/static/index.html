@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@audius/sdk@16.0.0/dist/sdk.min.js" defer></script><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/loras.js" defer></script><script src="/trainer.js" defer></script><script src="/artist.js" defer></script><script src="/audius.js" defer></script><script src="/app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111614"><title>YuE2 Studio · Beta — Make something worth hearing</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@audius/sdk@16.0.0/dist/sdk.min.js" defer></script><script src="/dataset.js" defer></script><script src="/models.js" defer></script><script src="/library.js" defer></script><script src="/loras.js" defer></script><script src="/trainer.js" defer></script><script src="/artist.js" defer></script><script src="/audius.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <svg class="icon-defs" aria-hidden="true"><defs>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -35,6 +35,7 @@
     <div class="workspace-label">STUDIO TOOLS</div>
     <button class="nav-item" id="runnerNav"><svg><use href="#i-spark"/></svg>LLM Runner</button>
     <button class="nav-item" id="advancedNav"><svg><use href="#i-sliders"/></svg>Engine settings</button>
+    <button class="nav-item" id="datasetNav"><svg><use href="#i-download"/></svg>Dataset Builder</button>
     <button class="nav-item" id="modelsNav"><svg><use href="#i-download"/></svg>Music models</button>
     <button class="nav-item" id="audiusNav"><svg><use href="#i-upload"/></svg>Connected platforms</button>
     <button class="nav-item" id="guideNav"><svg><use href="#i-info"/></svg>Studio guide</button>
@@ -112,8 +113,8 @@
           <div><label for="artistTrigger">Trigger phrase</label><input id="artistTrigger" placeholder="my_artist_sound"><details><summary>ⓘ Trigger phrase</summary><p class="hint">A distinctive phrase to associate with your artist. Future preparation will combine it with the shared style. Saving this setup does not train it yet.</p></details></div>
         </div>
         <label for="artistFolder">Dataset folder on this PC</label><div class="row"><input id="artistFolder" spellcheck="false"></div>
-        <label for="artistSuffix">Matching lyric filenames</label><select id="artistSuffix"><option value=".lyrics.txt">song.wav + song.lyrics.txt</option><option value=".txt">song.wav + song.txt</option></select>
-        <details><summary>ⓘ Lyrics are required for this new workflow</summary><p class="hint">Choose the naming convention used by your folder. Each audio filename must have an exact matching text filename, without its audio extension. UTF-8 text only, up to 64 KB per song. Plain .txt files are treated as lyrics only when you explicitly choose that option; style-only files are not lyrics. Include complete words with section tags, then check each preview against the recording. We do not rename or overwrite source files.</p></details>
+        <label for="artistSuffix">Preferred lyric filenames</label><select id="artistSuffix"><option value=".lyrics.txt">song.wav + song.lyrics.txt</option><option value=".txt">song.wav + song.txt</option></select>
+        <details><summary>ⓘ Lyrics are required for this new workflow</summary><p class="hint">Choose the naming convention used by your folder. Each audio filename must have an exact matching text filename, without its audio extension. UTF-8 text only, up to 64 KB per song. Both song.lyrics.txt and song.txt are recognized automatically; the selected convention wins if both exist. Style-only files are not lyrics. Include complete words with section tags, then check each preview against the recording. We do not rename or overwrite source files.</p></details>
         <label for="artistStyle">Shared style for every selected song</label><textarea id="artistStyle" rows="5" placeholder="Genre, vocal character, instruments, and production…"></textarea>
         <details><summary>ⓘ Shared style and full songs</summary><p class="hint">Keep lyrics separate from this description. Uses complete 30–360 second songs, not the acoustic trainer’s short clips. No model quality, encoder compatibility, or voice identity has been verified by this scan.</p></details>
         <button class="button primary" id="artistScan">Scan audio + lyrics · CPU only</button>
@@ -258,6 +259,45 @@
 <div class="model-engine-setup"><p class="feedback"><strong>GGUF needs a separately installed audio.cpp engine.</strong> This panel downloads model files only; it does not install or build audio.cpp. Install the engine outside Studio, then connect its executable below. Downloading a model alone does not complete GGUF setup. Torch does not need audio.cpp.</p><h3>1. Connect your installed audio.cpp engine</h3><p id="modelEngineFound" class="hint"></p><label for="modelExecutable">audio.cpp executable</label><input id="modelExecutable" placeholder="Automatic detection, or paste the full path to audiocpp_cli.exe" spellcheck="false"><button class="button subtle small" id="saveModelExecutable">Apply engine path</button><p class="hint">Standard build folders are detected automatically. Model downloads install weights, not the engine or CUDA drivers.</p><details><summary>Need to install the engine?</summary><p>Install a Yue2-capable audio.cpp build. On Windows, building requires Visual Studio C++ Build Tools, CMake/Ninja, and CUDA Toolkit for NVIDIA. Keep runtime DLLs beside the executable, then paste its full path above.</p><p><a href="https://github.com/vrgamegirl19/Yue2_Studio/blob/main/docs/gguf.md" target="_blank" rel="noreferrer">Step-by-step setup guide ↗</a> · <a href="https://github.com/0xShug0/audio.cpp/blob/fbe3eedbf6c504e45189e2cdcf1b257740a28863/docs/build/windows.md" target="_blank" rel="noreferrer">Windows build instructions ↗</a></p></details></div>
 <h3>2. Choose a GGUF model</h3><p id="modelGpu" class="hint"></p><p class="hint">Each download includes the F16 decoder and all four supporting files. Existing complete files are verified and reused. Source: <a href="https://huggingface.co/audio-cpp/Yue2-3B-GGUF" target="_blank" rel="noreferrer">audio-cpp on Hugging Face</a> (CC BY-NC 4.0).</p><p id="modelFolder" class="hint"></p><div id="modelCards" class="model-cards"></div><div class="model-transfer" id="modelTransfer" hidden><p id="modelTransferText" role="status" aria-live="polite"></p><progress id="modelProgress" max="100" value="0" aria-label="Model download progress"></progress><button class="button subtle small" id="cancelModelDownload">Cancel download</button></div><p id="modelSetupFeedback" role="status" class="hint"></p><p class="hint">Use model changes the engine and GGUF component paths only. Your song and sampling controls stay as they are. Advanced settings still expose every control and custom model folders.</p>
 </div><div class="dialog-footer"><button class="button subtle" id="refreshModelStatus">Refresh status</button><button class="button primary" id="doneModels">Back to my song</button></div></dialog>
+<dialog id="datasetDialog" class="wide-dialog">
+<div class="dialog-header"><div><span class="eyebrow">DATASET BUILDER</span><h2>Audio &amp; lyrics</h2><p>Download playlist audio, then find and review matching lyrics.</p></div><button class="icon-button close-dialog" aria-label="Close Dataset Builder"><svg><use href="#i-close"/></svg></button></div>
+<div class="dialog-body">
+<label for="datasetFolder">Dataset folder · absolute path</label><input id="datasetFolder" type="text" placeholder="E:\datasets\my-album">
+<div class="row wrap"><button id="datasetAudioTab" class="button subtle" aria-pressed="true" aria-controls="datasetAudioPanel">1. Download WAVs</button><button id="datasetLyricsTab" class="button subtle" aria-pressed="false" aria-controls="datasetLyricsPanel">2. Get lyrics</button><button id="datasetStructureTab" class="button subtle" aria-pressed="false" aria-controls="datasetStructurePanel">3. Add song structure</button></div>
+<section id="datasetAudioPanel">
+<p class="hint">Only download content you own or have permission to use. Public and unlisted playlists are supported; sign-in, restricted videos, and live streams are not supported.</p>
+<label for="datasetUrl">YouTube playlist URL</label><input id="datasetUrl" type="url" placeholder="https://www.youtube.com/playlist?list=…">
+<label for="datasetArtist">Fallback artist / band · optional</label><input id="datasetArtist" type="text" maxlength="200" placeholder="Artist or band name">
+<p class="hint">Used only when artist metadata and an Artist - Song title are missing. Existing artist names are kept. Title parsing is a best guess; review inferred names. Previously downloaded files are skipped, not renamed.</p>
+<p class="hint">Creates the folder if needed. Saves 48 kHz stereo, 16-bit WAV files named Artist - Song Title. Conversion does not improve YouTube audio quality. Inferred names are flagged for review. Existing files are never overwritten.</p>
+<p id="datasetTools" class="hint"></p>
+<button id="datasetInstall" class="button subtle">Install / update downloader</button>
+<p class="hint">Setup requires yt-dlp, FFmpeg/ffprobe, and Node.js 22+ or Deno 2.3+ on PATH. The button installs yt-dlp into Studio's Python environment; FFmpeg and the JavaScript runtime must be installed separately. Restart Studio after runtime installation.</p>
+<div class="row wrap"><button id="datasetStart" class="button primary">Download playlist as WAV</button><button id="datasetCancel" class="button subtle" disabled>Cancel import</button></div>
+<p id="datasetError" role="alert"></p><p id="datasetStatus" role="status"></p><progress id="datasetProgress" max="1" value="0" aria-label="Completed playlist tracks"></progress>
+<p class="hint">Closing this panel does not cancel the import. Start again with the same folder to skip verified completed tracks and retry failures.</p>
+<div id="datasetTracks"></div><p id="datasetLog" class="hint"></p>
+</section>
+<section id="datasetLyricsPanel" hidden>
+<h3>Get lyrics from LRCLIB</h3>
+<p class="hint">Load WAV files from the folder above. Check artist/song names, then search LRCLIB. Only the search names are sent; audio stays on your computer. Review each result before saving. No LLM editing or structure generation in this step.</p>
+<p class="hint">Saves matching Artist - Song.lyrics.txt files beside the WAVs, using the trainer's default naming. Matching .lyrics.txt or .txt files are recognized, skipped, and never overwritten. Use lyrics you have permission to use. Pending search results are lost on page reload.</p>
+<div class="row wrap"><button id="datasetLyricsLoad" class="button subtle">Load songs</button><button id="datasetLyricsSearchAll" class="button primary" disabled>Search missing lyrics</button><button id="datasetLyricsSaveAll" class="button primary" disabled>Save all selected matches</button><button id="datasetLyricsStop" class="button subtle" disabled>Stop search / save</button></div>
+<p id="datasetLyricsStatus" role="status"></p><div id="datasetLyricsTracks"></div>
+<p class="hint">Searches run one at a time. Stop or close this panel to stop after the current request. Search alone never saves; Save all writes each currently selected nonempty, non-instrumental result. Review selections before saving. Results are ranked by exact names, then duration difference—not a guarantee of lyric accuracy. <a href="https://lrclib.net/docs" target="_blank" rel="noreferrer">LRCLIB API documentation</a></p>
+</section>
+<section id="datasetStructurePanel" hidden>
+<h3>Add song structure with your LLM Runner</h3>
+<p class="hint">Uses saved .lyrics.txt or .txt files. The LLM suggests section labels and line numbers only; Studio inserts them without rewriting the lyric lines. Text-only suggestions may not match the actual recording—review before applying. Files with recognized section tags are skipped.</p>
+<button id="datasetStructureRunner" class="button subtle">Configure LLM Runner</button>
+<p id="datasetStructureModel" class="hint"></p>
+<label class="check-label"><input id="datasetStructureConsent" type="checkbox"> I approve sending lyrics and artist/title context to my selected LLM Runner. Cloud providers may charge for requests.</label>
+<p class="hint">Local LLMs may use GPU memory. Avoid running them alongside music generation or training on the same GPU.</p>
+<div class="row wrap"><button id="datasetStructureLoad" class="button subtle">Load saved lyrics</button><button id="datasetStructureAll" class="button primary" disabled>Suggest structure for untagged songs</button><button id="datasetStructureReviewAll" class="button subtle" disabled>Mark all suggestions reviewed</button><button id="datasetStructureApplyAll" class="button subtle" disabled>Apply all reviewed suggestions</button><button id="datasetStructureStop" class="button subtle" disabled>Stop after current song</button></div>
+<p id="datasetStructureStatus" role="status"></p><div id="datasetStructureTracks"></div>
+<p class="hint">Suggestions do not change files. Apply creates an exact original backup in .lyrics-backups before updating the matching lyric file. Stop or close the panel to stop the queue after the current request. Reloading the page discards unapplied suggestions. Rescan the trainer and save a new setup after changing lyrics.</p>
+</section>
+</div></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 <input id="textFile" type="file" accept=".txt,.md" hidden><input id="abcFile" type="file" accept=".abc,.txt" hidden><input id="projectFile" type="file" accept=".json" hidden>
 </body></html>
