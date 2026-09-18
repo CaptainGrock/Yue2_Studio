@@ -249,7 +249,7 @@ class JobManager:
         job['artifacts'] = [str(p.relative_to(directory)).replace('\\','/') for p in sorted(result.rglob('*')) if p.is_file()] if result.exists() else []
         if (result/'score.abc').exists():
             job['abc'] = (result/'score.abc').read_text(encoding='utf-8')
-        for name in ('result.json','studio_summary.json','transcription_manifest.json','training.json','training_models.json'):
+        for name in ('result.json','studio_summary.json','transcription_manifest.json','training.json','training_models.json','lyrics-cleaning.json'):
             path = result/name
             if path.is_file():
                 job.setdefault('receipts',{})[name] = json.loads(path.read_text(encoding='utf-8'))

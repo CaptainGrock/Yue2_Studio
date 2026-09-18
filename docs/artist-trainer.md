@@ -49,6 +49,12 @@ models, a separate runtime, caches and adapter checkpoints. See [setup details](
 
 ## Training controls and progress
 
+When you queue Artist LoRA training, Studio automatically cleans the lyrics in the frozen job copy before any model is loaded. The same cleaned text is used for both YuE2 model conditioning and lyric alignment. Your source lyric sidecars are never overwritten.
+
+The deterministic cleaner transliterates Latin accents to basic English letters, normalizes smart punctuation and Unicode whitespace, and removes invisible/control characters and unsupported symbols. Alignment stays enabled for these ordinary repairs; you do not need to set its weight to `0`. If genuinely non-Latin letters cannot be converted safely, queueing stops with a clear error instead of silently damaging the lyrics. Alignment weight `0` is only the fallback for retaining genuinely non-Latin lyrics without alignment.
+
+Each run preserves the resulting sidecars under `result/cleaned-lyrics/` and writes both `result/lyrics-cleaning.log` and `result/lyrics-cleaning.json`. These identify every changed character, its line and column, Unicode code point, replacement, and reason.
+
 ![Artist training controls with example values](../images/artist-trainer-controls.png)
 
 The screenshot predates the lyric-timing method and learning-rate schedule

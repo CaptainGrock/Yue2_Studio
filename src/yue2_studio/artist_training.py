@@ -15,7 +15,9 @@ def validate_project(project):
         raise ValueError('Select at least two songs: one must be held out for validation.')
     for row in selected:
         fresh=current.get(row['name'])
-        if not fresh or fresh['error'] or any(row[k]!=fresh[k] for k in ('bytes','mtime_ns','lyrics_sha256')):
+        source_lyrics_sha256=row.get('source_lyrics_sha256',row['lyrics_sha256'])
+        if (not fresh or fresh['error'] or row['bytes']!=fresh['bytes'] or row['mtime_ns']!=fresh['mtime_ns']
+                or source_lyrics_sha256!=fresh['lyrics_sha256']):
             raise ValueError('Selected audio or lyrics changed. Rescan and save a new artist setup.')
         if not 30<=row['seconds']<=360:
             raise ValueError('This experimental artist trainer supports 30–360 second recordings; exclude '+row['name'])
@@ -52,6 +54,9 @@ def training_spec(payload):
     if type(method) is not str or method not in ('mms','whisper'):
         raise ValueError('Choose MMS or Whisper-assisted lyric timing.')
     controls['alignment_method']=method
+    from .artist_lyrics import clean_project
+    project,cleaning=clean_project(project,selected,require_ascii=controls['alignment_weight']>0)
+    selected=validate_project(project)
     from .artist_setup import check_setup
     setup=check_setup()
     if not setup['files_and_imports_ready']:raise ValueError('Artist setup incomplete: '+'; '.join(setup['issues']))
@@ -60,5 +65,5 @@ def training_spec(payload):
         from .artist_setup import check_whisper_runtime
         check_whisper_runtime(runtime)
     return dict(title=project['name']+' · Artist LoRA',stage='artist_train',mode='artist_trainer',
-                project=project,controls=controls,python=str(runtime),paths=setup['paths'],holdout=selected[-1]['name'],
+                project=project,lyrics_cleaning=cleaning,controls=controls,python=str(runtime),paths=setup['paths'],holdout=selected[-1]['name'],
                 regularizer_revision=REG_REVISION,regularizer_sha256=REG_SHA256,gpu_confirmed=True)
