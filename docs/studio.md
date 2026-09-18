@@ -10,7 +10,7 @@ paths/names are examples, recovery shortcuts are local-only, and Artist controls
 show older 800/200 values rather than current 500/250 defaults. Follow the text
 when screenshot settings or historical status banners differ.
 
-Quick links: [trainers](#train-your-own-lora), [LoRA playback](#use-a-lora),
+Quick links: [Dataset Builder](#build-a-training-dataset), [trainers](#train-your-own-lora), [LoRA playback](#use-a-lora),
 [seed and comparison limits](#seeds-and-comparing-results),
 [all engine settings](settings.md).
 
@@ -102,6 +102,67 @@ retry, and the run displays a warning when recovery succeeds. Studio does not sh
 change its lyrics, score, sampling, or model. If the fresh retry also runs out of memory, Studio shows
 a GPU-memory dialog. Close other GPU applications and try again; a long or unusually complex song
 may exceed the available VRAM.
+
+## Build a training dataset
+
+![Dataset Builder in the Studio Tools sidebar](../images/dataset-builder-sidebar.png)
+
+Open **Studio Tools → Dataset Builder** to prepare audio and matching lyric
+sidecars before creating an Artist Trainer setup. The three tabs share one dataset
+folder. This tool does not begin training, and its output still needs human review.
+Use only recordings and lyrics you are permitted to download and use.
+
+### 1. Download WAVs
+
+![Download authorized playlist tracks as WAV files](../images/dataset-builder-download-wavs.png)
+
+Paste a public or unlisted YouTube playlist URL, choose an absolute output folder,
+and optionally enter a fallback artist or band for song-only titles. Studio downloads
+tracks sequentially and produces 48 kHz stereo PCM16 WAV files. Existing files are
+not overwritten; rerunning the same playlist and folder verifies and skips completed
+tracks while retrying failures. Per-track errors do not stop the remaining queue.
+
+Playlist import requires `yt-dlp[default]`, FFmpeg/ffprobe, and Node.js 22+ or
+Deno 2.3+. **Install / update downloader** manages yt-dlp only. Signed-in or
+restricted videos and live streams are not supported. Transcoding does not restore
+quality already lost in the source.
+
+### 2. Get lyrics
+
+![Search LRCLIB and save selected lyric matches](../images/dataset-builder-get-lyrics.png)
+
+Load the WAV folder, correct any inferred artist/title fields, then search missing
+lyrics through LRCLIB. Only artist and title search text is sent; local audio is not
+uploaded. Search results show artist, title, album and duration so you can choose and
+review the intended recording. Search alone never writes files.
+
+Save one reviewed result or choose **Save all selected matches**. New sidecars use
+`song.lyrics.txt`; both `song.lyrics.txt` and `song.txt` are recognized by Dataset
+Builder and Artist Trainer. Existing matching sidecars are skipped and never
+overwritten. The maximum 20 documented by LRCLIB applies to candidate matches returned
+for one search, not to the number of songs in your queue. Searches run sequentially
+and stop the batch if LRCLIB reports rate limiting.
+
+### 3. Add song structure
+
+![Use the configured LLM Runner to suggest section labels](../images/dataset-builder-add-structure.png)
+
+Load saved lyrics and use the existing LLM Runner to suggest `[Verse]`, `[Chorus]`,
+and other supported section labels. You must explicitly approve sending the lyric
+text and artist/title context to the selected runner. Cloud providers may charge;
+local runners can compete with music generation or training for GPU memory.
+
+The dedicated instruction asks the LLM for labels and original line numbers only.
+Studio validates that response and inserts tags into the original lyric lines itself;
+invalid or truncated responses are rejected. Compare the original and proposed text.
+You can review songs individually or choose **Mark all suggestions reviewed**, then
+**Apply all reviewed suggestions**. Applying creates an exact backup under
+`.lyrics-backups` before changing a sidecar. Text-only structure is still a guess—it
+does not analyze the recording—so check important boundaries and lyric accuracy.
+
+After applying tags, rescan Artist Trainer and save a new setup because saved setups
+contain lyric snapshots and hashes. Full requirements, recovery behavior, naming
+rules and limitations are in the [Dataset Builder guide](dataset-builder.md).
 
 ## Train and use LoRAs
 

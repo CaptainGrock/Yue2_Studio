@@ -1,7 +1,7 @@
 # YuE2 Studio · Beta
 
 A local web studio for **YuE2** with original songs, melody covers, an LLM writing room,
-automatic song batches, experimental Style and Artist LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
+automatic song batches, a playlist-to-training-dataset builder, experimental Style and Artist LoRA training, and detailed generation controls. Custom HTML/CSS/JavaScript UI;
 no Gradio or Node build. Artist training has a separate, explicitly installed runtime.
 
 **Beta preview:** tested on Windows with an RTX 5090. Other hardware configurations
@@ -102,6 +102,10 @@ are needed. Paths are resolved locally; this repository includes no weights.
   full-song lyric files, save a setup and explicitly queue training. Defaults are
   500 steps and save every 250. Playback loads your Artist adapter and its pinned
   companion together. [Walkthrough](docs/artist-trainer.md).
+- **Dataset Builder:** turn an authorized public or unlisted YouTube playlist into
+  48 kHz WAV files, find reviewable lyrics through LRCLIB, and optionally ask your
+  configured LLM Runner to suggest section tags. Existing files are never silently
+  overwritten. [Dataset Builder guide](docs/dataset-builder.md).
 - **Writing room:** choose an LLM provider, refresh its model list, enter your own
   API key or local endpoint, and generate/edit lyrics and styles.
 - **Surprise me:** choose batch size, vocal gender, style, language and optional
@@ -185,6 +189,7 @@ Your runs stay under the parent `runs/studio/`; keys are entered per browser ses
 ## Documentation
 
 - [Full workflow guide](docs/studio.md)
+- [Dataset Builder: playlist WAVs, lyrics and song structure](docs/dataset-builder.md)
 - [Audius publishing setup](docs/audius.md)
 - [Every advanced setting, defaults, performance and troubleshooting](docs/settings.md)
 - [Style Trainer](docs/trainer.md) · [Artist Trainer](docs/artist-trainer.md) · [LoRA playback](docs/lora.md)
@@ -257,3 +262,22 @@ comparison hint: **same seed does not guarantee identical music**.
 ![Song library with stars, title editing, search and date filters](images/song-library.png)
 
 ![Studio appearance presets](images/appearance-presets.png)
+
+### Dataset creation workflow
+
+Open **Dataset Builder** from Studio Tools, then move through its three tabs. These
+screenshots contain example local paths; no dataset or downloaded media is included
+in this repository.
+
+![Dataset Builder in the Studio Tools sidebar](images/dataset-builder-sidebar.png)
+
+![Download authorized playlist tracks as WAV files](images/dataset-builder-download-wavs.png)
+
+| Find and review lyrics | Suggest song structure |
+| --- | --- |
+| ![Search LRCLIB and save selected lyric matches](images/dataset-builder-get-lyrics.png) | ![Use the configured LLM Runner to suggest section labels](images/dataset-builder-add-structure.png) |
+
+The structure screenshot predates **Mark all suggestions reviewed**, which now sits
+between suggestion generation and bulk apply. See the
+[Dataset Builder guide](docs/dataset-builder.md) for requirements, review steps,
+file naming, backups and limitations.
