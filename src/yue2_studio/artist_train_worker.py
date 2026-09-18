@@ -23,6 +23,8 @@ def learning_rate_factor(step,steps,schedule):
 
 def run(spec,directory):
     if spec.get('gpu_confirmed') is not True:raise ValueError('GPU preparation/training was not approved.')
+    from .artist_lyrics import write_cleaning_artifacts
+    write_cleaning_artifacts(spec['project'],spec['lyrics_cleaning'],directory)
     from .settings import ROOT
     os.environ['HF_MODULES_CACHE']=str(ROOT/'hf_modules_artist')
     os.environ['HF_HUB_OFFLINE']='1'

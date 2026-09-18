@@ -164,9 +164,14 @@ def test_validation_controls_and_holdout(tmp_path,monkeypatch):
     registered={'files_and_imports_ready':True,'runtime':{'python':'custom/python.exe'},'paths':{'model':'custom-model'}}
     monkeypatch.setattr(artist_setup,'check_setup',lambda:registered)
     monkeypatch.setattr(artist_setup,'check_whisper_runtime',lambda _:dict(stable_ts='2.19.1'))
-    project={'id':'a'*32,'name':'test'}
+    lyrics='[Verse]\nSing café'
+    lyric_hash=__import__('hashlib').sha256(lyrics.encode()).hexdigest()
+    project={'id':'a'*32,'name':'test','tracks':[
+        {'name':'a','enabled':True,'lyrics':lyrics,'lyrics_name':'a.txt','lyrics_sha256':lyric_hash,'lyrics_bytes':len(lyrics.encode()),'lyrics_mtime_ns':'1'},
+        {'name':'b','enabled':True,'lyrics':'[Verse]\nHello','lyrics_name':'b.txt','lyrics_sha256':'b'*64,'lyrics_bytes':13,'lyrics_mtime_ns':'2'},
+    ]}
     monkeypatch.setattr(training.artist_trainer,'load_project',lambda _:project)
-    monkeypatch.setattr(training,'validate_project',lambda _:[{'name':'a'},{'name':'b'}])
+    monkeypatch.setattr(training,'validate_project',lambda value:[row for row in value['tracks'] if row['enabled']])
     monkeypatch.setattr(training,'ROOT',tmp_path)
     for file in ['.venv-artist/Scripts/python.exe','models/artist-regularizer/regularizer/minted_regularizer_pack.pt',
                  'models/artist-encoder-v4/tokenizer_head_joint_v4.pt','models/artist-encoder-v4/nar_lora_joint_v4.pt',
@@ -179,6 +184,8 @@ def test_validation_controls_and_holdout(tmp_path,monkeypatch):
     assert spec['controls']['checkpoint_every']==200
     assert spec['controls']['lr_schedule']=='auto'
     assert spec['controls']['alignment_method']=='mms'
+    assert spec['project']['tracks'][0]['lyrics'].endswith('cafe')
+    assert spec['lyrics_cleaning']['songs_changed']==1
     assert training.training_spec(dict(valid,alignment_method='whisper'))['controls']['alignment_method']=='whisper'
     assert training.training_spec(dict(valid,lr_schedule='legacy'))['controls']['lr_schedule']=='legacy'
     explicit=training.training_spec(dict(valid,steps=5000,checkpoint_every=200))
@@ -189,6 +196,27 @@ def test_validation_controls_and_holdout(tmp_path,monkeypatch):
         training.training_spec(dict(valid,alignment_method='other'))
     with pytest.raises(ValueError,match='automatic or legacy'):
         training.training_spec(dict(valid,lr_schedule='other'))
+
+
+def test_validation_uses_source_hash_after_frozen_lyrics_are_cleaned(monkeypatch):
+    source_hash='a'*64
+    cleaned_hash='b'*64
+    rows=[
+        {'name':'a.wav','enabled':True,'bytes':10,'mtime_ns':'1','seconds':60,
+         'lyrics_sha256':cleaned_hash,'source_lyrics_sha256':source_hash},
+        {'name':'b.wav','enabled':True,'bytes':20,'mtime_ns':'2','seconds':90,
+         'lyrics_sha256':'c'*64,'source_lyrics_sha256':'d'*64},
+    ]
+    project={'tracks':rows,'shared_style':'Piano','trigger':'artist'}
+    fresh=[
+        {'name':'a.wav','bytes':10,'mtime_ns':'1','seconds':60,'lyrics_sha256':source_hash,'error':''},
+        {'name':'b.wav','bytes':20,'mtime_ns':'2','seconds':90,'lyrics_sha256':'d'*64,'error':''},
+    ]
+    monkeypatch.setattr(training.artist_trainer,'scan',lambda _: {'tracks':fresh})
+    assert training.validate_project(project)==rows
+    fresh[0]['lyrics_sha256']='e'*64
+    with pytest.raises(ValueError,match='changed'):
+        training.validate_project(project)
 
 
 def test_artist_learning_rate_schedules_match_requested_steps():
