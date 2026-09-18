@@ -28,13 +28,21 @@ def payload(folder):
 
 def test_explicit_sidecar_choice_and_preview(dataset):
     strict=artist.scan({'folder':str(dataset)})
-    assert not strict['tracks'][0]['enabled']
-    assert 'Missing' in strict['tracks'][0]['error']
+    assert strict['tracks'][0]['enabled']
+    assert strict['tracks'][0]['lyrics_name']=='song.txt'
     data=payload(dataset)
     row=data['tracks'][0]
     assert row['enabled'] and row['lyrics'].startswith('[Verse]')
     assert row['lyrics_name']=='song.txt' and len(row['lyrics_sha256'])==64
     assert 'clips' not in row and 'clip_seconds' not in data
+
+
+def test_preferred_suffix_wins_and_other_is_fallback(dataset):
+    (dataset/'song.lyrics.txt').write_text('[Verse]\nPreferred words', encoding='utf-8')
+    assert artist.scan({'folder':str(dataset)})['tracks'][0]['lyrics_name']=='song.lyrics.txt'
+    assert artist.scan({'folder':str(dataset),'lyrics_suffix':'.txt'})['tracks'][0]['lyrics_name']=='song.txt'
+    (dataset/'song.txt').unlink()
+    assert artist.scan({'folder':str(dataset),'lyrics_suffix':'.txt'})['tracks'][0]['lyrics_name']=='song.lyrics.txt'
 
 
 def test_save_is_separate_versioned_and_rechecks_text(dataset,tmp_path):

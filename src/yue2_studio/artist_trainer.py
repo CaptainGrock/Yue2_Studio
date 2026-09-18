@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from .settings import ROOT
 from .trainer import _text, scan as audio_scan
+from .lyric_files import matching_lyrics
 
 
 def scan(payload):
@@ -24,7 +25,8 @@ def scan(payload):
     for row in data['tracks']:
         row.pop('clips',None)
         row['warnings'] = [w for w in row['warnings'] if w!='Shorter than one training clip.']
-        row.update(lyrics_name=Path(row['name']).stem+convention,lyrics='',lyrics_sha256='',lyrics_bytes=0,lyrics_mtime_ns='')
+        lyric_path = matching_lyrics(folder/row['name'], convention)
+        row.update(lyrics_name=lyric_path.name,lyrics='',lyrics_sha256='',lyrics_bytes=0,lyrics_mtime_ns='')
         try:
             if stems[Path(row['name']).stem.casefold()]>1:
                 raise ValueError('Multiple audio files share this name; make each audio/lyrics pair uniquely named.')

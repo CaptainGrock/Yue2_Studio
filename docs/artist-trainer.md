@@ -2,6 +2,10 @@
 
 ## Setup walkthrough
 
+Matching lyric files may use either `song.lyrics.txt` or `song.txt`. Both are
+detected automatically; the selected naming convention takes priority when both
+exist, with `.lyrics.txt` preferred by default.
+
 ![Artist dataset and lyric pairing](../images/artist-trainer-dataset.png)
 
 This workspace capture shows an example path, a local-only recovery shortcut and

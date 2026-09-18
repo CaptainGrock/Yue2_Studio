@@ -24,6 +24,7 @@ from .surprise import SurpriseManager
 from .compatibility import capabilities
 from .lifetime import BrowserLifetime
 from .model_manager import ModelManager
+from .dataset_import import DatasetImportManager
 
 STATIC = Path(__file__).parent/'static'
 
@@ -57,10 +58,11 @@ class StudioServer(ThreadingHTTPServer):
         self.jobs = manager or JobManager(root)
         self.surprises = SurpriseManager(self.jobs,self.llm_lock)
         self.models = ModelManager()
+        self.datasets = DatasetImportManager()
 
 
     def service_actions(self):
-        busy = (self.models.busy() or self.llm_lock.locked() or
+        busy = (self.datasets.busy() or self.models.busy() or self.llm_lock.locked() or
                 any(j['status'] in ('queued','running','cancelling') for j in self.jobs.list()) or
                 any(b['status'] in ('queued','writing','rendering','cancelling') for b in self.surprises.list()))
         if not self.auto_stopping and self.browser_lifetime.should_stop(busy):
@@ -70,6 +72,8 @@ class StudioServer(ThreadingHTTPServer):
 
     def server_close(self):
         self.browser_stop.set()
+        if hasattr(self,'datasets'):
+            self.datasets.cancel()
         if hasattr(self,'models'):
             self.models.cancel()
         super().server_close()
@@ -132,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                     'audius':audius_config(),
                     'paths':{'root':str(ROOT),'runs':str(self.server.jobs.root)},
                     'installed':{name:(ROOT/'models'/name).is_dir() for name in ('YuE2-3B','YuE2-Vae','SheetSage2','MERT-v2-FullSong')}})
+            elif path=='/api/dataset-import':
+                self.json(self.server.datasets.status())
             elif path=='/api/models':
                 self.json(self.server.models.status())
             elif path=='/api/loras':
@@ -173,6 +179,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
+            elif path=='/dataset.js':
+                self.file(STATIC/'dataset.js')
             elif path in ('/','/index.html','/app.js','/audius.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
@@ -214,6 +222,29 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/shutdown':
                 self.json({'status':'stopping'})
                 threading.Thread(target=self.server.shutdown,daemon=True).start()
+            elif path=='/api/dataset-import/start':
+                self.json(self.server.datasets.start(data),202)
+            elif path=='/api/dataset-import/install':
+                self.json(self.server.datasets.start({},install=True),202)
+            elif path=='/api/dataset-import/cancel':
+                self.json(self.server.datasets.cancel())
+            elif path in ('/api/dataset-lyrics/scan','/api/dataset-lyrics/search','/api/dataset-lyrics/save'):
+                from . import dataset_lyrics
+                action = path.rsplit('/',1)[-1]
+                self.json(getattr(dataset_lyrics,action)(data))
+            elif path in ('/api/dataset-structure/scan','/api/dataset-structure/propose','/api/dataset-structure/apply'):
+                from . import dataset_structure
+                action = path.rsplit('/',1)[-1]
+                if action == 'propose':
+                    if not self.server.llm_lock.acquire(blocking=False):
+                        self.json({'error':'The writing assistant is already working. Wait for its response.'},409)
+                        return
+                    try:
+                        self.json(dataset_structure.propose(data))
+                    finally:
+                        self.server.llm_lock.release()
+                else:
+                    self.json(getattr(dataset_structure,action)(data))
             elif path=='/api/models/check':
                 from .gguf import validate
                 settings = validate_settings(data)
