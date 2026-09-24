@@ -182,11 +182,21 @@ def complete(value, system, user):
         stop = data.get('done_reason','')
         truncated = stop=='length'
     elif protocol == 'lm_studio':
-        data = request_json(root.removesuffix('/v1')+'/api/v1/chat',cfg,{'model':model,'system_prompt':system,'input':user,
-            'context_length':cfg['context_length'],'max_output_tokens':limit,**temp})
-        text = ''.join(x.get('content','') for x in data.get('output',[]) if x.get('type')=='message')
-        stop = data.get('stop_reason','')
-        truncated = stop in ('length','max_tokens')
+        payload = {'model':model,'system_prompt':system,'input':user,
+            'context_length':cfg['context_length'],'max_output_tokens':limit,**temp}
+        try:
+            data = request_json(root.removesuffix('/v1')+'/api/v1/chat',cfg,payload)
+            text = ''.join(x.get('content','') for x in data.get('output',[]) if x.get('type')=='message')
+            stop = data.get('stop_reason','')
+            truncated = stop in ('length','max_tokens')
+        except ValueError as exc:
+            if 'HTTP 404' not in str(exc):
+                raise
+            data = request_json(root+'/chat/completions',cfg,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':user}],'max_tokens':limit,**temp})
+            choice = next(iter(data.get('choices',[])),{})
+            text = content_text(choice.get('message',{}).get('content'))
+            stop = choice.get('finish_reason','')
+            truncated = stop=='length'
     elif protocol == 'apifreellm':
         if temp or limit != 4096:
             raise ValueError('APIFreeLLM does not expose output-token or temperature controls in its runner. Use automatic temperature and the default 4096 setting (not sent).')

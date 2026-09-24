@@ -118,13 +118,16 @@ FIXED = [
 
 GROUPS.append(dict(id='lora', title='Style LoRA', subtitle='Experimental acoustic style adapters for the Python engine.', fields=[
     field('path', 'LoRA file', '', 'Full path to a compatible YuE2 acoustic .safetensors adapter. Blank uses the base model. Other model adapters are incompatible.'),
+    field('custom_folders', 'LoRA folders', [], 'Folders Studio scans recursively for YuE2 acoustic LoRA files (.safetensors and similar). Manage this list in the Style / Artist LoRA panel, not here.'),
     field('strength', 'LoRA strength', 1.0, '0 applies no effect. Lower strengths are subtler; above 1 may emphasize the learned sound but can introduce distortion or reduce coherence. There is no universal failure threshold.', minimum=0, maximum=2, step=.05),
     field('auto_trigger', 'Include trigger phrase', True, 'Include the adapter’s recorded trigger phrase in the submitted style if it is not already present. The style editor stays unchanged.'),
 ]))
 
 
 def defaults():
-    return {group['id']: {f['key']: f['default'] for f in group['fields']} for group in GROUPS}
+    result={group['id']: {f['key']: f['default'] for f in group['fields']} for group in GROUPS}
+    result['lora']['custom_folders']=[]
+    return result
 
 
 def validate_settings(data):
@@ -140,6 +143,18 @@ def validate_settings(data):
             raise ValueError(f'Unknown or invalid settings in {group_id}.')
         for key, value in values.items():
             f = fields[key]
+            if key=='custom_folders':
+                if value is None:
+                    result[group_id][key]=[]
+                    continue
+                if not isinstance(value,list) or any(not isinstance(entry,str) or len(entry)>1024 for entry in value):
+                    raise ValueError('LoRA folders: expected a list of folder paths.')
+                cleaned=[]
+                for entry in value:
+                    entry=entry.strip().strip('"').strip("'").strip()
+                    if entry and entry not in cleaned:cleaned.append(entry)
+                result[group_id][key]=cleaned[:24]
+                continue
             if value is None and f['default'] is None:
                 result[group_id][key] = None
                 continue

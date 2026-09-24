@@ -7,6 +7,7 @@ import threading
 import uuid
 
 from . import llm
+from . import llm_server
 from .jobs import now, write_json
 from .settings import validate_settings
 
@@ -152,8 +153,12 @@ class SurpriseManager:
                         acquired=self.llm_lock.acquire(timeout=.5)
                         if acquired:break
                     if event.is_set():break
+                    llm_server.ensure()  # revive the companion server if a render unloaded it
                     result=llm.assist({'connection':connection,'action':'song','brief':brief,
                                        'instructions':options['instructions']})
+                    if not event.is_set():
+                        # Lyric writing is done; free its GPU memory before the render starts.
+                        llm_server.release_for_render()
                 finally:
                     if acquired:self.llm_lock.release()
                 if event.is_set():break
@@ -170,8 +175,10 @@ class SurpriseManager:
                        (record['voice']!='instrumental' and draft['lyrics'].strip()==p['lyrics']) for p in previous):
                     raise ValueError('The LLM repeated an earlier song. This batch was stopped to avoid rendering duplicates.')
                 style=options['style'] if record.get('lock_style') else draft['style']
-                if not record.get('lock_style') and record['voice']!='any':style=VOICES[record['voice']]+' '+style
-                lyrics='' if record['voice']=='instrumental' else draft['lyrics']
+                if record['voice']!='any':style=VOICES[record['voice']]+' '+style
+                # Empty lyrics invite the composer to invent its own sung words; the
+                # native protocol expects minimal section cues for instrumentals instead.
+                lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n' if record['voice']=='instrumental' else draft['lyrics']
                 spec={'title':draft['title'],'mode':'create','stage':'audio',
                       'source_job':f'surprise:{batch_id}:{index+1}', 'settings':record['settings'],
                       'request':{'style':style,'lyrics':lyrics,'cot':record['cot'],'seed':secrets.randbits(63)}}

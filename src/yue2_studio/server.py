@@ -15,6 +15,7 @@ import threading
 import urllib.parse
 import urllib.request
 import uuid
+from copy import deepcopy
 import webbrowser
 
 from . import llm
@@ -23,6 +24,7 @@ from .settings import ROOT, GROUPS, FIXED, defaults, validate_settings
 from .surprise import SurpriseManager
 from .compatibility import capabilities
 from .lifetime import BrowserLifetime
+from . import llm_server
 from .model_manager import ModelManager
 from .dataset_import import DatasetImportManager
 
@@ -89,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Referrer-Policy','no-referrer')
         self.send_header('Cache-Control','no-store')
-        self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://api.audius.co https://*.audius.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://api.audius.co https://*.audius.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         super().end_headers()
 
     def json(self,data,status=200):
@@ -179,9 +181,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]+',name):
                     raise ValueError('Unknown upload.')
                 self.file(self.server.jobs.uploads/name)
+            elif path.startswith('/soundfont/'):
+                name = urllib.parse.unquote(path[len('/soundfont/'):])
+                if not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9#_-]+\.mp3',name):
+                    raise ValueError('Unknown soundfont file.')
+                target = STATIC/'soundfont'/name
+                if not target.is_file(): raise ValueError('Unknown soundfont file.')
+                self.file(target)
             elif path=='/dataset.js':
                 self.file(STATIC/'dataset.js')
-            elif path in ('/','/index.html','/app.js','/audius.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg'):
+            elif path in ('/','/index.html','/app.js','/audius.js','/library.js','/models.js','/loras.js','/trainer.js','/artist.js','/style.css','/mark.svg','/abcjs-basic-min.js'):
                 self.file(STATIC/('index.html' if path=='/' else path[1:]))
             else:
                 self.json({'error':'Not found.'},404)
@@ -276,7 +285,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.json(score_check(data.get('abc',''),data.get('strip',False),data.get('keep_voice','both')))
             elif path=='/api/loras/inspect':
                 from .loras import inspect_adapter
-                self.json(inspect_adapter(data.get('path')))
+                self.json(inspect_adapter(data.get('path'),data.get('folder')))
+            elif path=='/api/loras/folders/scan':
+                from .loras import scan_folder
+                self.json(scan_folder(data.get('folder'),data.get('base') or data.get('folder')))
+            elif path=='/api/loras/folders/scan-all':
+                from .loras import scan_folders
+                self.json(scan_folders(data.get('folders')))
             elif path=='/api/artist-trainer/scan':
                 from .artist_trainer import scan
                 self.json(scan(data))
@@ -331,6 +346,37 @@ class Handler(BaseHTTPRequestHandler):
                 with self.server.models.lock:
                     if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
                     self.json(self.server.jobs.generate(spec),202)
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/rerender',path):
+                job_id = path.split('/')[3]
+                original = self.server.jobs.detail(job_id)
+                if original['kind']!='generation':
+                    raise ValueError('Only music runs can be re-rendered.')
+                abc = str(data.get('abc') or '').strip()
+                lyrics = str(data.get('lyrics') or '')
+                if not abc and not lyrics:
+                    raise ValueError('Edit the score or lyrics before re-rendering.')
+                if abc:
+                    try: score_check(abc)
+                    except Exception as error: raise ValueError('ABC check failed: '+str(error))
+                spec = deepcopy(original['input'])
+                request = spec.setdefault('request',{})
+                if abc: request['abc'] = abc
+                elif 'abc' in request: del request['abc']
+                if lyrics and lyrics.strip(): request['lyrics'] = lyrics
+                title = str(data.get('title') or '').strip()
+                if title: spec['title'] = title[:180]
+                spec['source_job'] = job_id
+                with self.server.models.lock:
+                    if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
+                    self.json(self.server.jobs.generate(spec),202)
+            elif path=='/api/score/pitch':
+                from .score_edit import adjust_pitch
+                pitch = data.get('pitch') or {}
+                self.json(adjust_pitch(str(data.get('abc') or ''),
+                    int(pitch.get('start_char') or 0), int(pitch.get('end_char') or 0),
+                    int(pitch.get('semitones') or 0), int(pitch.get('octaves') or 0)))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/master',path):
+                self.json(self.server.jobs.master(path.split('/')[3]))
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/wav',path):
                 directory = self.server.jobs.directory(path.split('/')[3])
                 source = directory/'result/audio.flac'
@@ -353,7 +399,15 @@ class Handler(BaseHTTPRequestHandler):
                     self.json({'error':'The writing assistant is already working. Wait for its response.'},409)
                     return
                 try:
-                    self.json(llm.complete(data,'You are a helpful assistant.','Reply with a short connection confirmation.') if path.endswith('/test') else llm.assist(data))
+                    if path.endswith('/test'):
+                        llm_server.ensure()  # revive a companion server a render stopped
+                        self.json(llm.complete(data,'You are a helpful assistant.','Reply with a short connection confirmation.'))
+                    else:
+                        llm_server.ensure()  # revive a companion server a render stopped
+                        result = llm.assist(data)
+                        self.json(result)
+                        # Writing is done; free the companion LLM's GPU memory for the next render.
+                        llm_server.release_for_render()
                 finally:
                     self.server.llm_lock.release()
             else:
@@ -472,6 +526,7 @@ def main():
         return
     url=f'http://127.0.0.1:{server.server_port}'
     print(f'YuE2 Studio: {url}\nRuns: {server.jobs.root}\nPress Ctrl+C to stop.',flush=True)
+    llm_server.start()
     if not args.no_browser:
         webbrowser.open(url)
     try:
@@ -482,6 +537,7 @@ def main():
         server.surprises.close()
         server.jobs.close()
         server.server_close()
+        llm_server.stop()
 
 
 if __name__=='__main__':

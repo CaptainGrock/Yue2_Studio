@@ -14,6 +14,7 @@ import sys
 import threading
 import uuid
 
+from . import llm_server
 from .settings import ROOT, validate_settings
 
 SCRIPTS = ROOT / 'skills/yue2-music/scripts'
@@ -217,12 +218,17 @@ class JobManager:
 
     def list(self):
         with self.lock:
-            return deepcopy(sorted(self.jobs.values(),key=lambda j:j['created'],reverse=True))
+            jobs = deepcopy(sorted(self.jobs.values(),key=lambda j:j['created'],reverse=True))
+        for job in jobs:
+            job['mastered'] = (self.root/job['id']/'result/audio_mastered.flac').is_file()
+        return jobs
 
     def detail(self,job_id):
         with self.lock:
             directory = self.directory(job_id)
             job = deepcopy(self.jobs[job_id])
+        # Mastering state is derived from disk so re-installs and manual deletes stay truthful.
+        job['mastered'] = (directory/'result/audio_mastered.flac').is_file()
         log = directory/'run.log'
         if log.exists():
             with log.open('rb') as handle:
@@ -299,14 +305,55 @@ class JobManager:
             return deepcopy(job)
 
     def delete(self,job_id):
+        import time
         with self.lock:
             directory = self.directory(job_id)
             job = self.jobs[job_id]
             if job['status'] in ('queued','running','cancelling'):
                 raise ValueError('Cancel this run before removing it.')
-            shutil.rmtree(directory)
+            if not directory.exists():
+                # Disk and the in-memory list can diverge (e.g. the folder was
+                # removed externally). The entry is unrecoverable either way.
+                del self.jobs[job_id]
+                return {'deleted':job_id,'title':job.get('title')}
+            # Windows keeps briefly-locking handles (players, AV scanners, indexers)
+            # on freshly written audio. Retry so a transient lock cannot fail the removal.
+            last_error = None
+            for attempt in range(5):
+                try:
+                    shutil.rmtree(directory)
+                    last_error = None
+                    break
+                except OSError as exc:
+                    last_error = exc
+                    # A read-only bit makes rmtree fail on the file itself; retry ignores it.
+                    try:
+                        for child in directory.rglob('*'):
+                            try:child.chmod(0o666)
+                            except OSError:pass
+                        directory.chmod(0o777)
+                    except OSError:
+                        pass
+                    time.sleep(0.4*(attempt+1))
+            if last_error is not None:
+                raise ValueError('Windows still holds a handle on this run\'s files (close any player using its audio and try again): '+str(last_error))
             del self.jobs[job_id]
             return {'deleted':job_id,'title':job.get('title')}
+
+    def master(self,job_id):
+        with self.lock:
+            directory = self.directory(job_id)
+            job = self.jobs[job_id]
+            if job['kind']!='generation' or job['status'] not in ('complete','needs_review'):
+                raise ValueError('Only completed songs can be mastered.')
+            source = directory/'result/audio.flac'
+            if not source.is_file():
+                raise ValueError('This run has no rendered audio.')
+            from .mastering import master_file
+            metrics = master_file(source, directory/'result/audio_mastered.flac')
+            job['mastering'] = metrics
+            self._persist(job)
+            return {'mastered': True, 'url': f'/artifacts/{job_id}/result/audio_mastered.flac', 'metrics': metrics}
 
     def _command(self,job_id,spec,input_name='input.json'):
         directory = self.directory(job_id)
@@ -340,6 +387,9 @@ class JobManager:
                     job = self.jobs[job_id]
                     if job['status']!='queued':
                         continue
+                    # Whatever kind of GPU work this is, the companion LLM server
+                    # must not be holding ~19 GiB of VRAM while it runs.
+                    llm_server.release_for_render()
                     directory = self.directory(job_id)
                     spec = json.loads((directory/'input.json').read_text(encoding='utf-8'))
                     command = self._command(job_id,spec)

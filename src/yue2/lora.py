@@ -62,14 +62,28 @@ class AcousticLoRA:
         import json
         header_size = int.from_bytes(data[:8], "little")
         metadata = json.loads(data[8:8 + header_size]).get("__metadata__", {})
-        if metadata.get("format") not in {None, "comfyui-native-lora", "yue2-lora-v1"}:
+        if metadata.get("format") not in {None, "comfyui-native-lora", "yue2-lora-v1", "pt"}:
             raise ValueError("Unsupported LoRA format")
+        # Two community naming conventions carry the same math (delta = up @ down):
+        # ComfyUI's .lora_down.weight/.lora_up.weight and PEFT's .lora_A/.lora_B.
+        down_suffix = next((s for s in (".lora_down.weight", ".lora_A")
+                            if any(k.endswith(s) for k in tensors)), None)
+        if down_suffix is None:
+            raise ValueError("LoRA is empty or contains unsupported/unpaired tensors")
+        up_suffix = ".lora_up.weight" if down_suffix == ".lora_down.weight" else ".lora_B"
+        def canonical(name):
+            # Keep diffusion_model. intact: _targets maps native branch names
+            # (mlp -> nar_mlp) only when it sees the native prefix itself.
+            # Community files sometimes omit the model. prefix on native targets.
+            if name.startswith("layers."):
+                name = "model." + name
+            return name
         groups, used = [], set()
         for key in sorted(tensors):
-            if not key.endswith(".lora_down.weight"):
+            if not key.endswith(down_suffix):
                 continue
-            name = key[:-len(".lora_down.weight")]
-            up_key, alpha_key = name + ".lora_up.weight", name + ".alpha"
+            name = key[:-len(down_suffix)]
+            up_key, alpha_key = name + up_suffix, name + ".alpha"
             if up_key not in tensors:
                 raise ValueError(f"Missing LoRA up matrix: {name}")
             down, up = tensors[key], tensors[up_key]
@@ -82,12 +96,25 @@ class AcousticLoRA:
                 raise ValueError(f"Invalid LoRA alpha: {name}")
             default_alpha = metadata.get("alpha", down.shape[0]) if metadata.get("format") == "yue2-lora-v1" else down.shape[0]
             scale = validate_strength(alpha.item() if alpha is not None else default_alpha) / down.shape[0]
-            groups.append((tuple(_targets(name)), down.float(), up.float(), scale))
+            try:
+                targets = tuple(_targets(canonical(name)))
+            except ValueError as exc:
+                label = canonical(name)
+                if label.startswith("text_encoders."):
+                    raise ValueError("Targets the planner text-encoder branch, which the acoustic style engine cannot apply") from exc
+                if re.fullmatch(r"model\.layers\.\d+\.(mlp|self_attn)\..+", label):
+                    raise ValueError("Targets the AR composer branch, which the acoustic style engine cannot apply") from exc
+                raise
+            groups.append((targets, down.float(), up.float(), scale))
             used.update((key, up_key))
             if alpha is not None:
                 used.add(alpha_key)
-        if not groups or used != tensors.keys():
+        if not groups:
             raise ValueError("LoRA is empty or contains unsupported/unpaired tensors")
+        if used != tensors.keys():
+            extra = sorted(set(tensors) - used)
+            raise ValueError("Contains tensors the acoustic engine cannot apply: "
+                             + ", ".join(extra[:3]) + ("…" if len(extra) > 3 else ""))
         return cls(str(path), hashlib.sha256(data).hexdigest(), metadata, tuple(groups))
 
     def info(self, strength):
