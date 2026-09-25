@@ -243,8 +243,7 @@ function bindRunMenus(){
   edMenu.addEventListener('click',async e=>{
     const b=e.target.closest('button[data-edit]');if(!b)return;
     edMenu.hidden=true;const id=state.runId;if(!id)return;
-    if(b.dataset.edit==='editor'){$('runEditBtn').click();const ed=$('runScoreEditor');if(ed)ed.scrollIntoView({behavior:'smooth',block:'start'});if($('runScoreTa'))$('runScoreTa').focus();}
-    else if(b.dataset.edit==='rerender'){try{await startRerender(id);}catch(error){feedbackError(error);}}
+    if(b.dataset.edit==='rerender'){try{await startRerender(id);}catch(error){feedbackError(error);}}
     else if(b.dataset.edit==='load'){const job=state.jobs.find(j=>j.id===id);if(job)useRun(job,false);}
     else if(b.dataset.edit==='export'){const job=await api('/api/jobs/'+id);download('yue2-run-'+id.slice(0,8)+'.json',JSON.stringify(job.input,null,2));}
   });
