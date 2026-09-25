@@ -490,7 +490,11 @@ function bindLyricExports(){
    note spans back to original coordinates, so hover-pluck and drag-to-edit
    keep addressing the real score and the server never sees w: lines. */
 function lyricWords(raw){
-  return (raw||'').replace(/\[[^\]]*\]/g,' ').split(/\n+/)
+  // Drop parenthetical performance instructions (e.g. "(Fast, driving lyre and
+  // flute melody with a steady drum beat)") alongside [Section] tags: they are
+  // stage directions, not sung syllables, and consuming them as lyric words
+  // shifts every later syllable onto the wrong note.
+  return (raw||'').replace(/\[[^\]]*\]/g,' ').replace(/\([^)]*\)/g,' ').split(/\n+/)
     .flatMap(line=>line.trim()?line.trim().split(/\s+/):[])
     .map(w=>w.replace(/\s+/g,'')).filter(Boolean);
 }
@@ -708,6 +712,7 @@ function stopScorePreview(){
     runScoreState.previewCtl=null;
   }
   previewCursorClear(runScoreState.previewCursor);
+  if(runScoreState._pvRaf){try{cancelAnimationFrame(runScoreState._pvRaf);}catch(e){}runScoreState._pvRaf=null;}
   if(runScoreState._pvWatch){try{clearInterval(runScoreState._pvWatch);}catch(e){}runScoreState._pvWatch=null;runScoreState._pvLastMs=0;runScoreState._pvStalls=0;}
   const ctlBox=$('runPreviewCtl');
   if(ctlBox){ctlBox.hidden=true;ctlBox.innerHTML='';}
@@ -756,6 +761,11 @@ async function startScorePreview(){
       if(!t){clearInterval(watch);return;}
       if(t.isPaused)return;
       const ms=t.currentTime||0;
+      // Stall watchdog: if the timer clock itself freezes while a long score is
+      // still running, abcjs's internal scheduler has dropped the rest of the
+      // audio - nudge it forward past the dead spot. This only ever calls
+      // ctl.seek() on the synth (never the audio player), so playback restarts
+      // from the stall point rather than skipping real music.
       if(ms<runScoreState._pvLastMs+50){
         runScoreState._pvStalls=(runScoreState._pvStalls||0)+1;
         if(runScoreState._pvStalls>=2&&ms<runScoreState.totalMs-500){
@@ -766,6 +776,23 @@ async function startScorePreview(){
       runScoreState._pvLastMs=ms;
     },500);
     runScoreState._pvWatch=watch;
+    // Periodic visual re-sync: abcjs has been observed to stop firing onEvent
+    // partway into long scores (highlight goes dark or sticks). Drive the
+    // preview cursor straight from the synth timer clock at display rate, in
+    // parallel with the event callbacks. Display-only - the audio path is
+    // never touched, so a drifted highlight snaps back without disturbing
+    // playback. previewCursorApply dedupes by entry.ms, so this costs nothing
+    // when onEvent is healthy and has already moved the cursor.
+    const pvLoop=()=>{
+      if(!runScoreState.previewOn||runScoreState.previewCtl!==ctl){runScoreState._pvRaf=null;return;}
+      const tr=ctl.timer;
+      if(tr&&!tr.isPaused){
+        const entry=previewNearestEntry(runScoreState.timings,tr.currentTime||0);
+        if(entry)previewCursorApply(runScoreState.previewCursor,entry,'runScoreSheet');
+      }
+      runScoreState._pvRaf=requestAnimationFrame(pvLoop);
+    };
+    runScoreState._pvRaf=requestAnimationFrame(pvLoop);
   }catch(err){
     show('Preview failed: '+((err&&err.message)||err),true);
     try{ctl&&ctl.stop&&ctl.stop();}catch(e){}
