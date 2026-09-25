@@ -166,6 +166,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.json({'batches':self.server.surprises.list()})
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}',path):
                 self.json(self.server.jobs.detail(path.split('/')[-1]))
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/timemap',path):
+                job_id=path.split('/')[3]
+                self.server.jobs.directory(job_id)  # validates the id
+                import numpy  # noqa: F401  (timemap needs numpy; fail loudly if missing)
+                from .timemap import build
+                out=build(self.server.jobs.directory(job_id))
+                if out is None:
+                    raise ValueError('This run has no score/audio pair to sync.')
+                self.json(out)
             elif path.startswith('/artifacts/'):
                 parts = path.split('/',3)
                 if len(parts)!=4:

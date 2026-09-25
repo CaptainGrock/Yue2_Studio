@@ -384,7 +384,11 @@ class JobManager:
                 return
             try:
                 with self.lock:
-                    job = self.jobs[job_id]
+                    job = self.jobs.get(job_id)
+                    if job is None:
+                        # Deleted (or cancelled and removed) while queued: skip
+                        # it. One unknown id must never kill the queue thread.
+                        continue
                     if job['status']!='queued':
                         continue
                     # Whatever kind of GPU work this is, the companion LLM server
@@ -487,9 +491,10 @@ class JobManager:
                     self._persist(job)
             except Exception as exc:
                 with self.lock:
-                    job = self.jobs[job_id]
-                    job.update(status='failed',error=str(exc),finished=now())
-                    self._persist(job)
+                    job = self.jobs.get(job_id)
+                    if job is not None:
+                        job.update(status='failed',error=str(exc),finished=now())
+                        self._persist(job)
             finally:
                 with self.lock:
                     self.process = None

@@ -52,7 +52,7 @@ class SurpriseManager:
             return deepcopy(sorted(self.records.values(),key=lambda r:r['created'],reverse=True))
 
     def start(self, payload):
-        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity','lock_style'}:
+        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity','lock_style','length'}:
             raise ValueError('Unknown Surprise me options.')
         lock_style=payload.get('lock_style',False)
         if type(lock_style) is not bool:
@@ -63,6 +63,9 @@ class SurpriseManager:
         voice=payload.get('voice','any')
         cot=payload.get('cot','full')
         profanity=payload.get('profanity','prompt')
+        length=payload.get('length','default')
+        if length not in ('short','default'):
+            raise ValueError('Choose a supported song length.')
         if profanity not in ('prompt','required'):
             raise ValueError('Choose a supported profanity setting.')
         if profanity=='required' and voice=='instrumental':
@@ -87,7 +90,7 @@ class SurpriseManager:
             if any(r['status'] in ACTIVE for r in self.records.values()):
                 raise ValueError('A surprise batch is already active. Finish or stop it before starting another.')
             record=dict(id=uuid.uuid4().hex,created=now(),status='queued',count=count,voice=voice,profanity=profanity,
-                        cot=cot,lock_style=lock_style,options=options,settings=settings,provider=connection['provider'],
+                        cot=cot,lock_style=lock_style,length=length,options=options,settings=settings,provider=connection['provider'],
                         model=connection['model'],songs=[],current=0)
             self.records[record['id']]=record
             event=threading.Event()
@@ -147,6 +150,10 @@ class SurpriseManager:
                     brief += ' STYLE IS LOCKED: invent only the title and lyrics to fit the supplied style. Do not redesign the genre, arrangement, or vocal character. The supplied style takes precedence over conflicting vocal directions; any style you return will be ignored.'
                 if record.get('profanity')=='required':
                     brief += ' '+PROFANITY_DIRECTION
+                if record.get('length')=='short':
+                    brief += (' SONG LENGTH: keep it SHORT, roughly one minute of music. Write at most about 150 words of lyrics '
+                             '(a short verse and one chorus, or an instrumental-style piece with minimal lyrics). No bridge, no second verse, '
+                             'no extended outro. End the song cleanly; do not pad sections.')
                 acquired=False
                 try:
                     while not event.is_set():
@@ -179,8 +186,15 @@ class SurpriseManager:
                 # Empty lyrics invite the composer to invent its own sung words; the
                 # native protocol expects minimal section cues for instrumentals instead.
                 lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n' if record['voice']=='instrumental' else draft['lyrics']
+                batch_settings=deepcopy(record['settings'])
+                if record.get('length')=='short':
+                    # A full 4096-token plan is several minutes of music; a one-minute
+                    # song only needs a fraction. The cap prevents runaway plans that
+                    # later exhaust VRAM during synthesis.
+                    batch_settings['abc']['max_tokens']=min(int(batch_settings['abc'].get('max_tokens') or 4096),1536)
+                    batch_settings['abc']['min_tokens']=min(int(batch_settings['abc'].get('min_tokens') or 32),64)
                 spec={'title':draft['title'],'mode':'create','stage':'audio',
-                      'source_job':f'surprise:{batch_id}:{index+1}', 'settings':record['settings'],
+                      'source_job':f'surprise:{batch_id}:{index+1}', 'settings':batch_settings,
                       'request':{'style':style,'lyrics':lyrics,'cot':record['cot'],'seed':secrets.randbits(63)}}
                 # Lock prevents a stop request from slipping between submission and ownership.
                 with self.lock:

@@ -93,7 +93,7 @@ const EXPERIMENTS={
 };
 function matchingExperimentLevel(experiment){return experiment.levels.findIndex(level=>Object.entries(level.values).every(([key,value])=>state.settings[experiment.group]?.[key]===value));}
 function experimentSummary(name,level){const v=level.values;if(name==='influence')return 'CFG: '+(v.cfg_scale===null?'Automatic (1.0, or 1.01 in Direct audio)':v.cfg_scale);return (name==='composition'?'Planner':'Audio tokens')+': temp '+v.temperature+' · top-p '+v.top_p+' · top-k '+v.top_k;}
-function updateExperimentalSliders(){if(!state.boot)return;for(const [name,experiment] of Object.entries(EXPERIMENTS)){const slider=$(experiment.slider);if(!slider)continue;const match=matchingExperimentLevel(experiment),level=experiment.levels[match<0?2:match],control=slider.closest('.experiment-control');if(match>=0)slider.value=match;$(experiment.output).textContent=match<0?'Custom advanced values':level.label;$(experiment.summary).textContent=match<0?'Open Advanced settings to review the custom values.':experimentSummary(name,level);control.classList.toggle('custom',match<0);const bypassed=state.settings.runtime?.backend==='audio.cpp'||(name==='composition'&&($('planMode').value==='off'||Boolean($('abc').value.trim())));slider.disabled=bypassed;control.classList.toggle('bypassed',bypassed);if(bypassed)$(experiment.output).textContent='Not used for this song';slider.setAttribute('aria-valuetext',$(experiment.output).textContent);}}
+function updateExperimentalSliders(){if(!state.boot)return;for(const [name,experiment] of Object.entries(EXPERIMENTS)){const slider=$(experiment.slider);if(!slider)continue;const match=matchingExperimentLevel(experiment),level=experiment.levels[match<0?2:match],control=slider.closest('.experiment-control');if(match>=0)slider.value=match;$(experiment.output).textContent=match<0?'Custom advanced values':level.label;$(experiment.summary).textContent=match<0?'Open Advanced settings to review the custom values.':experimentSummary(name,level);control.classList.toggle('custom',match<0);const unused=name==='composition'&&($('planMode').value==='off'||Boolean($('abc').value.trim()));const disabled=state.settings.runtime?.backend==='audio.cpp';slider.disabled=disabled;control.classList.toggle('bypassed',disabled||unused);if(unused)$(experiment.output).textContent='Not used for this song';slider.setAttribute('aria-valuetext',$(experiment.output).textContent);}}
 function applyExperiment(name,index){const experiment=EXPERIMENTS[name];if(!experiment||!Number.isInteger(index)||!experiment.levels[index]||$(experiment.slider).disabled)return;const level=experiment.levels[index];Object.assign(state.settings[experiment.group],level.values);updateCounts();save();}
 function resetExperiments(){if(state.settings.runtime?.backend==='audio.cpp')return;for(const experiment of Object.values(EXPERIMENTS))Object.assign(state.settings[experiment.group],experiment.levels[2].values);updateCounts();save();toast('Experimental sliders reset to engine defaults.');}
 function bindExperimentalSliders(){for(const [name,experiment] of Object.entries(EXPERIMENTS))$(experiment.slider).addEventListener('input',event=>applyExperiment(name,Number(event.target.value)));$('resetExperimental').onclick=resetExperiments;updateExperimentalSliders();}
@@ -128,15 +128,53 @@ async function refreshLibraryJobs(){try{const result=await api('/api/jobs');stat
 function artifactUrl(id,path){return '/artifacts/'+id+'/'+path.split('/').map(encodeURIComponent).join('/');}
 let runScoreState={jobId:'',abc:'',lyrics:'',editing:false,previewOn:false,previewCtl:null,dragLink:null,userEdited:false,previewCursor:{els:null,key:null}};;
 function lyricsOf(job){return (job.input&&job.input.request&&job.input.request.lyrics)||'';}
-function renderRunScore(){const box=$('runScoreSheet');if(!box||!runScoreState.jobId)return;const textPre=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;const rkey=runScoreState.editing+'|'+textPre;if(runScoreState.renderKey===rkey&&box.querySelector('svg')){syncRunCursor();return;}runScoreState.renderKey=rkey;const __sy=box?box.scrollTop:0,__sx=box?box.scrollLeft:0;runScoreState.timings=null;runScoreState.cursorEls=null;runScoreState.cursorKey=null;runScoreState.noteMap=null;runScoreState.msByEl=null;runScoreState.totalMs=0;box.innerHTML='';const hint=$('runScoreHint');hint.hidden=true;hint.textContent='';const text=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;if(!text){box.innerHTML='<p class="hint">This run has no score to display.</p>';return;}if(!window.ABCJS){box.textContent=text;hint.hidden=false;hint.textContent='abcjs failed to load - showing ABC text instead.';return;}try{const width=Math.max(320,Math.min(880,(box.clientWidth||800)-16));const visual=ABCJS.renderAbc(box,text,{staffwidth:width,paddingtop:8,paddingbottom:8,add_classes:true,scrollVertical:true});try{if(visual&&visual[0]){let tms=visual[0].setTiming(0,0);if(!tms||!tms.length)tms=visual[0].setTiming(120,0);if(tms)runScoreState.timings=tms.filter(t=>t&&isFinite(t.milliseconds)&&t.elements&&t.elements.length).map(t=>({ms:t.milliseconds,elements:t.elements})).sort((a,b)=>a.ms-b.ms);try{runScoreState.noteMap=tms.filter(t=>t&&t.type==='event'&&typeof t.startChar==='number'&&typeof t.endChar==='number'&&t.endChar>t.startChar&&t.endChar<=text.length&&/^[=_^]?[A-Ga-g][#b]?[,']*[0-9/>|-]*$/.test(text.slice(t.startChar,t.endChar))&&t.elements&&t.elements.length).map(t=>({startChar:t.startChar,endChar:t.endChar,els:(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g:[g]),[]).filter(Boolean)})).filter(n=>n.els.length);runScoreState.msByEl=(function(){const m=new Map();for(const t of runScoreState.timings||[]){for(const g of (t.elements||[])){for(const e of (Array.isArray(g)?g:[g]))if(e)m.set(e,t.ms);}}return m;})();runScoreState.totalMs=runScoreState.timings&&runScoreState.timings.length?runScoreState.timings[runScoreState.timings.length-1].ms:0;}catch(e2){runScoreState.noteMap=null;runScoreState.msByEl=null;runScoreState.totalMs=0;}}}catch(err){}syncRunCursor();const svg=box.querySelector('svg');if(svg){const w=parseFloat(svg.getAttribute('width'))||svg.clientWidth||width;const h=parseFloat(svg.getAttribute('height'))||svg.clientHeight||0;if(w&&h){svg.setAttribute('viewBox','0 0 '+w+' '+h);}svg.removeAttribute('width');svg.removeAttribute('height');svg.style.width=((sheetZoom.run||1)*100)+'%';ensureZoomBar('run');ensureTransport('run');box.scrollTop=__sy;box.scrollLeft=__sx;}const first=box.querySelector('svg');if(first&&first.warnings&&first.warnings.length){hint.hidden=false;hint.textContent='abcjs notes: '+first.warnings.join(' | ');}}catch(err){box.innerHTML='';const fb=document.createElement('pre');fb.textContent=text;box.append(fb);hint.hidden=false;hint.textContent='Score could not be drawn: '+err.message;}}
-function syncRunCursor(){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');const dur=player.duration;if(!dur||!isFinite(dur))return;const last=timings[timings.length-1].ms;if(!(last>0))return;const scoreMs=player.currentTime/dur*last;let lo=0,hi=timings.length-1,idx=0;while(lo<=hi){const mid=(lo+hi)>>1;if(timings[mid].ms<=scoreMs){idx=mid;lo=mid+1;}else hi=mid-1;}const t=timings[idx];const els=(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g.filter(e=>e&&e.classList):[]),[]);const key=t.ms+'#'+els.length;if(runScoreState.cursorKey===key&&runScoreState.cursorEls)return;if(runScoreState.cursorEls)runScoreState.cursorEls.forEach(e=>e.classList.remove('abc-playing'));runScoreState.cursorEls=els;runScoreState.cursorKey=key;els.forEach(e=>e.classList.add('abc-playing'));const box=$('runScoreSheet');const el=els[0];if(el&&el.getBoundingClientRect){const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();const inView=r.top>=b.top&&r.bottom<=b.bottom;if(!inView){if(r.bottom>b.bottom-24)box.scrollTop+=r.bottom-b.bottom-64;else if(r.top<b.top+24)box.scrollTop+=r.top-b.top+64;}}}function seekSheet(event){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');if(!player.duration||!isFinite(player.duration))return;const last=timings[timings.length-1].ms;if(!(last>0))return;let best=null,bd=Infinity;for(const t of timings){const el=t.elements&&t.elements[0]&&t.elements[0][0];if(!el||!el.getBoundingClientRect)continue;const r=el.getBoundingClientRect();const d=(r.left+r.width/2-event.clientX)**2+((r.top+r.height/2-event.clientY)**2)/4;if(d<bd){bd=d;best=t;}}if(best){player.currentTime=best.ms/last*player.duration;runScoreState.cursorKey=null;syncRunCursor();}}function syncRunEditor(){const editing=runScoreState.editing;const ed=$('runScoreEditor');if(ed)ed.classList.toggle('open',editing);const ew=$('runLyricsEditWrap');if(ew)ew.style.display=editing?'block':'none';const lt=$('runLyricsText');if(lt)lt.style.display=editing?'none':'block';setScoreDragging(true);}
-function setRunEditing(on){stopScorePreview();detachScoreDrag();runScoreState.editing=on;$('runEditBtn').textContent=on?'Close editor':'Edit score & lyrics';if(on){$('runScoreTa').value=runScoreState.abc;$('runLyricsEdit').value=runScoreState.lyrics;}else{runScoreState.abc=$('runScoreTa').value;runScoreState.lyrics=$('runLyricsEdit').value;renderRunScore();}syncRunEditor();}
+function renderRunScore(){const box=$('runScoreSheet');if(!box||!runScoreState.jobId)return;const textPre=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;const rkey=runScoreState.editing+'|'+textPre;if(runScoreState.renderKey===rkey&&box.querySelector('svg')){syncRunCursor();return;}runScoreState.renderKey=rkey;const __sy=box?box.scrollTop:0,__sx=box?box.scrollLeft:0;runScoreState.timings=null;runScoreState.cursorEls=null;runScoreState.cursorKey=null;runScoreState.noteMap=null;runScoreState.msByEl=null;runScoreState.totalMs=0;box.innerHTML='';const hint=$('runScoreHint');hint.hidden=true;hint.textContent='';const text=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;if(!text){box.innerHTML='<p class="hint">This run has no score to display.</p>';return;}if(!window.ABCJS){box.textContent=text;hint.hidden=false;hint.textContent='abcjs failed to load - showing ABC text instead.';return;}try{const width=Math.max(320,Math.min(880,(box.clientWidth||800)-16));const visual=ABCJS.renderAbc(box,text,{staffwidth:width,paddingtop:8,paddingbottom:8,add_classes:true,scrollVertical:true});try{if(visual&&visual[0]){let tms=visual[0].setTiming(0,0);if(!tms||!tms.length)tms=visual[0].setTiming(120,0);if(tms)runScoreState.timings=tms.filter(t=>t&&isFinite(t.milliseconds)&&t.elements&&t.elements.length).map(t=>({ms:t.milliseconds,elements:t.elements})).sort((a,b)=>a.ms-b.ms);try{runScoreState.noteMap=tms.filter(t=>t&&t.type==='event'&&typeof t.startChar==='number'&&typeof t.endChar==='number'&&t.endChar>t.startChar&&t.endChar<=text.length&&t.elements&&t.elements.length).map(t=>{const sp=noteSpanOnly(text,t.startChar,t.endChar);return sp?{startChar:sp.start,endChar:sp.end,els:(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g:[g]),[]).filter(Boolean)}:null;}).filter(n=>n&&n.els.length);runScoreState.msByEl=(function(){const m=new Map();for(const t of runScoreState.timings||[]){for(const g of (t.elements||[])){for(const e of (Array.isArray(g)?g:[g]))if(e)m.set(e,t.ms);}}return m;})();runScoreState.totalMs=runScoreState.timings&&runScoreState.timings.length?runScoreState.timings[runScoreState.timings.length-1].ms:0;}catch(e2){runScoreState.noteMap=null;runScoreState.msByEl=null;runScoreState.totalMs=0;}}}catch(err){}syncRunCursor();const svg=box.querySelector('svg');if(svg){const w=parseFloat(svg.getAttribute('width'))||svg.clientWidth||width;const h=parseFloat(svg.getAttribute('height'))||svg.clientHeight||0;if(w&&h){svg.setAttribute('viewBox','0 0 '+w+' '+h);}svg.removeAttribute('width');svg.removeAttribute('height');svg.style.width=((sheetZoom.run||1)*100)+'%';ensureZoomBar('run');ensureTransport('run');box.scrollTop=__sy;box.scrollLeft=__sx;}const first=box.querySelector('svg');if(first&&first.warnings&&first.warnings.length){hint.hidden=false;hint.textContent='abcjs notes: '+first.warnings.join(' | ');}}catch(err){box.innerHTML='';const fb=document.createElement('pre');fb.textContent=text;box.append(fb);hint.hidden=false;hint.textContent='Score could not be drawn: '+err.message;}}
+function timemapScoreMs(audioSec){
+  const m=runScoreState.timemap;
+  if(!m||!m.anchors||m.anchors.length<2)return null;
+  const a=m.anchors;
+  if(audioSec<=a[0][0])return a[0][1]*1000;
+  for(let i=0;i<a.length-1;i++){
+    if(audioSec<=a[i+1][0]){
+      const [a0,s0]=a[i],[a1,s1]=a[i+1];
+      const f=(audioSec-a0)/Math.max(1e-6,a1-a0);
+      return (s0+f*(s1-s0))*1000;
+    }
+  }
+  const [a0,s0]=a[a.length-2],[a1,s1]=a[a.length-1];
+  const f=(audioSec-a0)/Math.max(1e-6,a1-a0);
+  return (s0+f*(s1-s0))*1000;
+}
+function timemapAudioMs(scoreMs){
+  const m=runScoreState.timemap;
+  if(!m||!m.anchors||m.anchors.length<2)return null;
+  const a=m.anchors, sSec=scoreMs/1000;
+  if(sSec<=a[0][1])return a[0][0]*1000;
+  for(let i=0;i<a.length-1;i++){
+    if(sSec<=a[i+1][1]){
+      const [a0,s0]=a[i],[a1,s1]=a[i+1];
+      const f=(sSec-s0)/Math.max(1e-6,s1-s0);
+      return (a0+f*(a1-a0))*1000;
+    }
+  }
+  const [a0,s0]=a[a.length-2],[a1,s1]=a[a.length-1];
+  const f=(sSec-s0)/Math.max(1e-6,s1-s0);
+  return (a0+f*(a1-a0))*1000;
+}
+async function loadRunTimemap(jobId){
+  try{
+    const m=await api('/api/jobs/'+jobId+'/timemap');
+    if(state.runId===jobId&&m&&m.anchors&&m.anchors.length>=2)runScoreState.timemap=m;
+  }catch(e){/* no map: linear fallback stays */}
+}
+function syncRunCursor(){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');const dur=player.duration;if(!dur||!isFinite(dur))return;const last=timings[timings.length-1].ms;if(!(last>0))return;const mapped=timemapScoreMs(player.currentTime);const scoreMs=mapped!=null?mapped:player.currentTime/dur*last;let lo=0,hi=timings.length-1,idx=0;while(lo<=hi){const mid=(lo+hi)>>1;if(timings[mid].ms<=scoreMs){idx=mid;lo=mid+1;}else hi=mid-1;}const t=timings[idx];const els=(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g.filter(e=>e&&e.classList):[]),[]);const key=t.ms+'#'+els.length;if(runScoreState.cursorKey===key&&runScoreState.cursorEls)return;if(runScoreState.cursorEls)runScoreState.cursorEls.forEach(e=>e.classList.remove('abc-playing'));runScoreState.cursorEls=els;runScoreState.cursorKey=key;els.forEach(e=>e.classList.add('abc-playing'));const box=$('runScoreSheet');const el=els[0];if(el&&el.getBoundingClientRect){const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();const inView=r.top>=b.top&&r.bottom<=b.bottom;if(!inView){if(r.bottom>b.bottom-24)box.scrollTop+=r.bottom-b.bottom-64;else if(r.top<b.top+24)box.scrollTop+=r.top-b.top+64;}}}function seekSheet(event){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');if(!player.duration||!isFinite(player.duration))return;const last=timings[timings.length-1].ms;if(!(last>0))return;let best=null,bd=Infinity;for(const t of timings){const el=t.elements&&t.elements[0]&&t.elements[0][0];if(!el||!el.getBoundingClientRect)continue;const r=el.getBoundingClientRect();const d=(r.left+r.width/2-event.clientX)**2+((r.top+r.height/2-event.clientY)**2)/4;if(d<bd){bd=d;best=t;}}if(best){const inv=timemapAudioMs(best.ms);player.currentTime=inv!=null?Math.min(player.duration-0.05,inv/1000):best.ms/last*player.duration;runScoreState.cursorKey=null;syncRunCursor();}}function syncRunEditor(){const editing=runScoreState.editing;const ed=$('runScoreEditor');if(ed)ed.classList.toggle('open',editing);const ew=$('runLyricsEditWrap');if(ew)ew.style.display=editing?'block':'none';const lt=$('runLyricsText');if(lt)lt.style.display=editing?'none':'block';setScoreDragging(true);}
+function setRunEditing(on){stopScorePreview();detachScoreDrag();runScoreState.editing=on;$('runEditBtn').textContent=on?'Close editor':'Edit score & lyrics';if(on){$('runScoreTa').value=runScoreState.abc;$('runLyricsEdit').value=runScoreState.lyrics;}else{runScoreState.lyrics=$('runLyricsEdit').value;if(runScoreState.overlay){runScoreState.baseAbc=stripLyricsFromAbc($('runScoreTa').value);applyRunOverlay();}else{runScoreState.abc=$('runScoreTa').value;renderRunScore();}}syncRunEditor();}
 async function startRerender(id){const abc=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;const lyrics=runScoreState.editing&&$('runLyricsEdit').value.trim()?$('runLyricsEdit').value:'';if(!abc&&!lyrics)throw new Error('Edit the score or lyrics first.');const next=await api('/api/jobs/'+id+'/rerender',{abc,lyrics});state.activeId=next.id;runScoreState.editing=false;syncRunEditor();await openRun(next.id);await poll();toast('Re-render queued with your edits.');}
 async function openRun(id){state.runId=id;await updateRun();if(!$('runDialog').open)$('runDialog').showModal();}
 function removeRun(id){const job=state.jobs.find(j=>j.id===id);if(!job)return;if(['queued','running','cancelling'].includes(job.status)){toast('Cancel this run before removing it.',true);return;}confirmReplace('Remove this run?','This permanently deletes "'+job.title+'" and its audio, score, and settings from the library.',async()=>{try{// Release the browser's own handle on this run's audio before deleting on disk.
 for(const audio of document.querySelectorAll('audio'))if(audio.src.includes(id)){audio.pause();audio.removeAttribute('src');audio.load();}
 await api('/api/jobs/'+id+'/delete',{});state.jobs=state.jobs.filter(j=>j.id!==id);$('libraryCount').textContent=state.jobs.length;if(state.view==='library')renderLibrary();toast('Run removed.');}catch(error){feedbackError(error);}});}
-async function updateRun(){if(!state.runId)return;const id=state.runId;const job=await api('/api/jobs/'+id);if(state.runId!==id)return;renderProgress('runProgress',job);$('runTitle').textContent=job.title;$('runType').textContent=job.kind==='trainer_setup'?'TRAINING-MODEL DOWNLOAD':job.kind==='training'?'LORA TRAINING':job.kind==='transcription'?'SOURCE TRANSCRIPTION':job.stage==='plan'?'SYMBOLIC PLAN':'STUDIO RUN';$('runMeta').textContent=(statusText[job.status]||job.status)+' · '+new Date(job.created).toLocaleString();message('runFeedback',job.error||job.warning||(job.runtime_adjustments?'Compatibility: using '+job.runtime_adjustments.effective_backend+'. '+job.runtime_adjustments.reason:''),Boolean(job.error));$('runLogPath').textContent=job.log_path||'';$('runLog').textContent=job.log;$('runRequest').textContent=JSON.stringify(job.input,null,2);$('runReceipts').textContent=JSON.stringify(job.receipts||{},null,2);$('runScoreSection').hidden=!job.abc;const scoreOpen=$('runScoreSection').open;if(runScoreState.jobId!==id){stopScorePreview();detachScoreDrag();runScoreState={jobId:id,abc:job.abc||'',lyrics:lyricsOf(job),editing:false,userEdited:false,previewCursor:{els:null,key:null}};$('runEditBtn').textContent='Edit score & lyrics';}else{if(!runScoreState.editing&&!runScoreState.userEdited)runScoreState.abc=job.abc||'';runScoreState.lyrics=lyricsOf(job);}$('runLyricsEdit').value=runScoreState.lyrics;syncRunEditor();if(scoreOpen)renderRunScore();$('runScore').textContent=runScoreState.abc||'';const hasAudio=job.artifacts.includes('result/audio.flac');$('runPlayer').hidden=!hasAudio;if(state.runSourceJob!==id){state.runSourceJob=id;state.runSource=job.mastered?'master':'original';}
+async function updateRun(){if(!state.runId)return;const id=state.runId;const job=await api('/api/jobs/'+id);if(state.runId!==id)return;renderProgress('runProgress',job);$('runTitle').textContent=job.title;$('runType').textContent=job.kind==='trainer_setup'?'TRAINING-MODEL DOWNLOAD':job.kind==='training'?'LORA TRAINING':job.kind==='transcription'?'SOURCE TRANSCRIPTION':job.stage==='plan'?'SYMBOLIC PLAN':'STUDIO RUN';$('runMeta').textContent=(statusText[job.status]||job.status)+' · '+new Date(job.created).toLocaleString();message('runFeedback',job.error||job.warning||(job.runtime_adjustments?'Compatibility: using '+job.runtime_adjustments.effective_backend+'. '+job.runtime_adjustments.reason:''),Boolean(job.error));$('runLogPath').textContent=job.log_path||'';$('runLog').textContent=job.log;$('runRequest').textContent=JSON.stringify(job.input,null,2);$('runReceipts').textContent=JSON.stringify(job.receipts||{},null,2);$('runScoreSection').hidden=!job.abc;const scoreOpen=$('runScoreSection').open;if(runScoreState.jobId!==id){stopScorePreview();detachScoreDrag();runScoreState={jobId:id,abc:job.abc||'',lyrics:lyricsOf(job),editing:false,userEdited:false,baseAbc:null,overlay:false,overlayOffsets:[],overlayWords:null,autoOverlay:false,previewCursor:{els:null,key:null}};$('runEditBtn').textContent='Edit score & lyrics';loadRunTimemap(id);}else{if(!runScoreState.editing&&!runScoreState.userEdited&&!runScoreState.overlay)runScoreState.abc=job.abc||'';runScoreState.lyrics=lyricsOf(job);}$('runLyricsEdit').value=runScoreState.lyrics;syncRunEditor();const ovBtn=$('runLyricsOverlayBtn');if(ovBtn){if(ovBtn.dataset.bound!=='1'){ovBtn.onclick=toggleRunLyricsOverlay;ovBtn.dataset.bound='1';}ovBtn.hidden=!(job.abc&&(runScoreState.lyrics||'').trim());if(ovBtn.hidden)runScoreState.autoOverlay=false;if(job.abc&&(runScoreState.lyrics||'').trim()&&!runScoreState.overlay&&!runScoreState.autoOverlay){runScoreState.autoOverlay=true;runScoreState.baseAbc=stripLyricsFromAbc(runScoreState.abc);runScoreState.overlay=true;applyRunOverlay();}updateRunOverlayButton();}if(scoreOpen)renderRunScore();$('runScore').textContent=runScoreState.abc||'';const hasAudio=job.artifacts.includes('result/audio.flac');$('runPlayer').hidden=!hasAudio;if(state.runSourceJob!==id){state.runSourceJob=id;state.runSource=job.mastered?'master':'original';}
 if(!job.mastered)state.runSource='original';
 const audioUrl=artifactUrl(id,state.runSource==='master'?'result/audio_mastered.flac':'result/audio.flac');if(hasAudio&&$('runPlayer').getAttribute('src')!==audioUrl){$('runPlayer').playbackRate=1;$('runSpeed').value='1';$('runPlayer').src=audioUrl;}const speedRow=$('runSpeedRow');speedRow.hidden=!hasAudio;if(hasAudio&&$('runSpeed').value)$('runPlayer').playbackRate=parseFloat($('runSpeed').value);if(!hasAudio){$('runPlayer').pause();$('runPlayer').removeAttribute('src');}const actions=$('runActions');actions.replaceChildren();const logLink=document.createElement('a');logLink.href=artifactUrl(id,'run.log');logLink.download='run.log';logLink.className='button small';logLink.textContent='Download log';actions.append(logLink);if(job.kind==='generation'&&['failed','cancelled','interrupted'].includes(job.status)){const retry=button('Retry saved song',async()=>{try{retry.disabled=true;const next=await api('/api/jobs/'+id+'/retry',{});state.activeId=next.id;await openRun(next.id);await poll();}catch(e){feedbackError(e);}finally{retry.disabled=false;}},'primary small');retry.title='Reuses saved lyrics, style and settings. No LLM call.';actions.append(retry);}if(['queued','running','cancelling'].includes(job.status)){const b=button(job.status==='cancelling'?'Stopping…':'Cancel run',async()=>{try{b.disabled=true;await api('/api/jobs/'+id+'/cancel',{});await poll();}catch(e){feedbackError(e);}finally{b.disabled=false;}},'danger small');b.disabled=job.status==='cancelling';actions.append(b);}if(hasAudio&&job.kind==='generation'&&['complete','needs_review'].includes(job.status)){
 if(job.mastered){
@@ -166,12 +204,13 @@ function bindSurprise() {
       if($('surpriseProfanity').value==='required'&&!state.boot.profanity_check)throw new Error('Restart Studio after the current batch finishes to enable the profanity check.');
       const count = Number($('surpriseCount').value);
       if (!Number.isInteger(count) || count < 1 || count > 50) throw new Error('Choose 1–50 songs.');
+      if(hasSong()&&!window.confirm('Surprise me ignores the song in the editor and invents its own lyrics, style and title. Start anyway?'))return;
       if($('surpriseLockStyle').checked&&!state.boot.surprise_style_lock)throw new Error('Restart Studio after current jobs finish to enable locked-style Surprise batches.');
       if($('surpriseLockStyle').checked&&!$('surpriseStyle').value.trim())throw new Error('Enter a style direction before locking it.');
       await api('/api/surprises', {
         ...(state.boot.surprise_style_lock?{lock_style:$('surpriseLockStyle').checked}:{}),
         count, ...(state.boot.profanity_check?{profanity:$('surpriseProfanity').value}:{}), voice: $('surpriseVoice').value, style: $('surpriseStyle').value,
-        language: $('surpriseLanguage').value, brief: $('brief').value,
+        language: $('surpriseLanguage').value, length: $('surpriseLength').value, brief: $('brief').value,
         instructions: $('writingInstructions').value, cot: $('planMode').value,
         settings: state.settings, connection: state.connection
       });
@@ -297,18 +336,119 @@ function bindLyricExports(){
   addLyricExports($('editorLyricExports'),()=>({title:$('songTitle').value,style:$('style').value,lyrics:$('lyrics').value,source:'editor'}));
   addLyricExports($('draftLyricExports'),()=>({title:$('draftTitle').value,style:$('draftStyle').value,lyrics:$('draftLyrics').value,source:'reviewed_llm_draft'}));
 }
+/* == lyrics aligned under the vocal notes (display-only overlay) == */
+/* YuE2 ABC scores carry no lyric line: the words live in a separate field.
+   This overlay invents an ABC w: line from the song's lyrics - one word (or
+   hyphenated syllable) per Vocal note - and renders THAT copy, while the
+   original score stays untouched in baseAbc. Insertion offsets map rendered
+   note spans back to original coordinates, so hover-pluck and drag-to-edit
+   keep addressing the real score and the server never sees w: lines. */
+function lyricWords(raw){
+  return (raw||'').replace(/\[[^\]]*\]/g,' ').split(/\n+/)
+    .flatMap(line=>line.trim()?line.trim().split(/\s+/):[])
+    .map(w=>w.replace(/\s+/g,'')).filter(Boolean);
+}
+function stripLyricsFromAbc(text){
+  return (text||'').split('\n').filter(l=>!/^[ \t]*w:/.test(l)).join('\n');
+}
+function abcWithLyrics(text,lyrics){
+  const clean=stripLyricsFromAbc(text);
+  const words=lyricWords(lyrics);
+  if(!words.length)return{text:clean,insertions:[],words:0,used:0};
+  // Flatten words into a syllable stream: a word of N hyphen parts consumes N
+  // notes; the last syllable of each word is marked with a hyphen suffix on
+  // the previous syllable, matching ABC's w: hyphenation convention. This
+  // can never deadlock: every note simply takes the next syllable or *.
+  const syls=[];
+  for(const w of words){
+    const parts=w.split('-').filter(Boolean);
+    if(!parts.length)continue;
+    parts.forEach((p,i)=>syls.push(i<parts.length-1?p+'-':p));
+  }
+  const lines=clean.split('\n');
+  const out=[];const insertions=[];let pos=0,si=0,inVocal=false;
+  const NOTE_RE=/(?:[=^_]){0,2}[A-Ga-g](?![A-Za-z])[#b]?[,']*/g;
+  for(const line of lines){
+    const vm=/^[ \t]*V:[ \t]*(\S+)/.exec(line);
+    if(vm){inVocal=/^(Vocal|V)$/i.test(vm[1])&&!/inst/i.test(vm[1]);
+      out.push(line);pos+=line.length+1;continue;}
+    if(!inVocal||/^[ \t]*([A-Za-z]:|%)/.test(line)){out.push(line);pos+=line.length+1;continue;}
+    const body=line;
+    out.push(line);pos+=line.length+1;
+    // w: tokens map 1:1 to EVERY slot in order - notes AND rests. Walk the
+    // raw line left-to-right: chord names and grace notes take no slot, a
+    // rest slot gets '*', a note slot gets the next syllable.
+    const TOK=/"[^"]*"|\{[^}]*\}|\[[^\]]*\]|[xXzZ](?![A-Za-z])\d*|(?:[=^_]){0,2}[A-Ga-g](?![A-Za-z])[#b]?[,']*(?:\d+\/?\d*|\/\d*)?[>-]*/g;
+    const toks=[];let m,done=false;
+    while(!done&&(m=TOK.exec(body))){
+      const t=m[0];
+      if(t[0]=='"'||t[0]=='{')continue;      // chord symbol / grace notes: no slot
+      if(/^[xXzZ]/.test(t)){toks.push('*');continue;}  // rest: keep the slot
+      if(si<syls.length)toks.push(syls[si++]);          // note: next syllable
+      else done=true;
+    }
+    if(toks.length){
+      const wl='w: '+toks.join(' ');
+      insertions.push({pos,len:wl.length+1});
+      out.push(wl);pos+=wl.length+1;
+    }
+    if(si>=syls.length)break;
+  }
+  return{text:out.join('\n'),insertions,words:words.length,used:si};
+}
+function applyRunOverlay(){
+  const st=runScoreState;
+  const r=abcWithLyrics(st.baseAbc,st.lyrics||'');
+  st.abc=r.text;st.overlayOffsets=r.insertions;st.overlayWords={used:r.used,total:r.words};
+  st.renderKey=null;
+  if(st.editing)$('runScoreTa').value=st.abc;
+  renderRunScore();
+  const hint=$('runScoreHint');
+  if(hint&&r.used<r.words){
+    hint.hidden=false;
+    hint.textContent='Aligned '+r.used+' of '+r.words+' lyric words: the melody has '+(r.used<r.words?'fewer notes than words.':'more notes; the rest were left blank.');
+  }
+}
+function toggleRunLyricsOverlay(){
+  const st=runScoreState;
+  if(!st.jobId)return;
+  if(!st.overlay){
+    st.baseAbc=stripLyricsFromAbc(st.editing?$('runScoreTa').value:st.abc);
+    st.overlay=true;
+    applyRunOverlay();
+  }else{
+    st.overlay=false;st.overlayOffsets=[];st.overlayWords=null;
+    if(st.editing)$('runScoreTa').value=st.baseAbc;
+    st.abc=st.baseAbc;st.renderKey=null;
+    renderRunScore();
+  }
+  updateRunOverlayButton();
+}
+function updateRunOverlayButton(){
+  const btn=$('runLyricsOverlayBtn');
+  if(!btn)return;
+  btn.textContent=runScoreState.overlay?'Hide lyrics on score':'Show lyrics on score';
+}
 /* == score drag & piano preview (appended) == */
 /* == score drag & piano preview (appended) == */
-function currentScoreText(){return runScoreState.editing?$('runScoreTa').value:runScoreState.abc;}
-function setCurrentScoreText(v){if(runScoreState.editing){$('runScoreTa').value=v;}else{runScoreState.abc=v;}}
+function currentScoreText(){if(runScoreState.overlay)return runScoreState.baseAbc??runScoreState.abc;return runScoreState.editing?$('runScoreTa').value:runScoreState.abc;}
+function setCurrentScoreText(v){if(runScoreState.overlay){runScoreState.baseAbc=v;applyRunOverlay();}else if(runScoreState.editing){$('runScoreTa').value=v;}else{runScoreState.abc=v;}}
 /* Collect every rendered note group: abcjs augments the real SVG <g> with an
    abcelem expando carrying the source-text span (startChar/endChar) and pitches. */
+function noteSpanOnly(text,start,end){
+  const slice=text.slice(start,end);
+  const m=/^(?:"[^"]*")?((?:[=^_]){0,2}[A-Ga-g](?![A-Za-z])[#b]?[,']*[0-9/>|-]*)$/.exec(slice);
+  if(!m)return null;
+  return {start:start+slice.length-m[1].length,end:end};
+}
 function scoreNoteSpans(){
   const map=runScoreState.noteMap;
-  const text=currentScoreText();
   if(!map)return[];
-  return map.filter(n=>n.endChar<=text.length&&/^[=_^]?[A-Ga-g][#b]?[,']*[0-9/>|-]*$/.test(text.slice(n.startChar,n.endChar)))
-            .map(n=>({els:n.els,startChar:n.startChar,endChar:n.endChar}));
+  const ins=runScoreState.overlay?runScoreState.overlayOffsets:null;
+  const text=(runScoreState.overlay?runScoreState.abc:currentScoreText())||'';
+  const conv=ch=>{if(!ins)return ch;let c=ch;for(const o of ins){if(o.pos<=c)c-=o.len;}return c;};
+  return map.filter(n=>n.endChar<=text.length&&noteSpanOnly(text,n.startChar,n.endChar))
+            .map(n=>{const sp=noteSpanOnly(text,n.startChar,n.endChar);return {els:n.els,startChar:conv(sp.start),endChar:conv(sp.end)};});
 }
 function setDragHint(msg){
   const h=$('runDragHint');
@@ -967,7 +1107,11 @@ function ensureTransport(which){
   const sync=()=>{b.textContent=p.paused?'\u25b6':'\u2759\u2759';};
   const p=$('runPlayer');
   if(p){p.addEventListener('play',sync);p.addEventListener('pause',sync);}
-  sheet.appendChild(b);
+  // Sticky row pinned to the top-right of the sheet while it scrolls.
+  const row=document.createElement('div');
+  row.className='score-transport-row';
+  row.append(b);
+  sheet.insertBefore(row,sheet.firstChild);
 }
 
 if(!state.abcPreviewCursor)state.abcPreviewCursor={els:null,key:null};
