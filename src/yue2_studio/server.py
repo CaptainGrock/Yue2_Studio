@@ -401,6 +401,27 @@ class Handler(BaseHTTPRequestHandler):
                                 outgoing.write(block)
                         temporary.replace(target)
                 self.json({'url':f'/artifacts/{directory.name}/audio.wav'})
+            elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}/mp3',path):
+                directory = self.server.jobs.directory(path.split('/')[3])
+                source = directory/'result/audio.flac'
+                if not source.is_file():
+                    raise ValueError('This run has no rendered audio.')
+                import shutil as _shutil, subprocess as _subprocess
+                import concurrent.futures as _futures
+                ffmpeg = _shutil.which('ffmpeg') or r'C:\\ffmpeg\\bin\\ffmpeg.exe'
+                if not Path(ffmpeg).is_file():
+                    raise ValueError('MP3 export needs ffmpeg on PATH or at C:\\ffmpeg\\bin\\ffmpeg.exe.')
+                target = directory/'audio.mp3'
+                with self.server.jobs.lock:
+                    if not target.exists() or target.stat().st_mtime < source.stat().st_mtime:
+                        temporary = directory/'audio.tmp.mp3'
+                        proc = _subprocess.run([ffmpeg,'-y','-loglevel','error','-i',str(source),
+                            '-codec:a','libmp3lame','-qscale:a','2',str(temporary)],
+                            capture_output=True,timeout=300)
+                        if proc.returncode!=0 or not temporary.is_file():
+                            raise RuntimeError('MP3 conversion failed: '+proc.stderr.decode('utf-8','replace')[:300])
+                        temporary.replace(target)
+                self.json({'url':f'/artifacts/{directory.name}/audio.mp3'})
             elif path=='/api/llm/models':
                 self.json(llm.models(data))
             elif path in ('/api/llm/test','/api/llm/assist'):

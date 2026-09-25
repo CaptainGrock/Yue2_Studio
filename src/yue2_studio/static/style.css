@@ -9,6 +9,18 @@
 .surprise-panel{margin-top:25px;padding-top:23px;border-top:1px solid #405344}.surprise-panel .eyebrow{font-size:8px;letter-spacing:1.2px}.surprise-panel .section-heading{margin-bottom:8px}.surprise-panel h2{font-size:18px}.surprise-panel label{margin-top:16px}.surprise-options{gap:10px;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.surprise-button{width:100%;margin-top:16px;font-size:11px}.surprise-songs{display:flex;flex-direction:column;gap:7px;margin:12px 0}.surprise-songs button{justify-content:space-between;text-align:left;overflow-wrap:anywhere}.surprise-songs small{font-size:9px;color:var(--muted);white-space:nowrap}
 @media(max-width:680px){.setting-field:has(input[type=text]){grid-template-columns:1fr}.setting-field:has(input[type=text]) input{grid-column:1/-1}}
 .engine-progress{margin:18px 0;padding:18px;border:1px solid var(--border,#334139);border-radius:12px;background:rgba(130,190,155,.035)}
+/* Run dialog: collapsed stage details, compat info, header menus */
+.engine-progress[data-collapsed='1'] .progress-stages,.engine-progress[data-collapsed='1'] progress,.engine-progress[data-collapsed='1'] .hint{display:none}
+.engine-progress[data-collapsed='1']{cursor:pointer}
+.engine-progress[data-collapsed='1'] .progress-heading::after{content:' \25b8 details';font-size:9px;color:var(--muted);margin-left:8px}
+.compat-info{display:inline-flex;align-items:center;margin-left:6px;color:var(--muted);cursor:help;position:relative}
+.compat-info svg{width:13px;height:13px}
+.compat-info:hover::after{content:attr(data-tip);position:absolute;z-index:40;left:18px;top:-6px;width:min(320px,60vw);padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--sidebar,#141a17);color:var(--text);font-size:10px;line-height:1.5;box-shadow:0 14px 45px #0008;white-space:normal}
+.run-header-actions{display:flex;gap:8px;align-items:center;position:relative}
+.run-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:230px;display:flex;flex-direction:column;padding:6px;border:1px solid var(--border);border-radius:9px;background:var(--sidebar,#141a17);box-shadow:0 14px 45px #0008}
+.run-menu button{text-align:left;padding:8px 10px;border:0;background:transparent;color:var(--text);border-radius:6px;font-size:12px;cursor:pointer}
+.run-menu button:hover{background:var(--hover)}
+.log-actions{margin:6px 0;display:flex;justify-content:flex-end}
 .progress-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px}
 .engine-progress progress{display:block;width:100%;height:8px;border:0;border-radius:8px;overflow:hidden;accent-color:#96ddb0;background:#283a30}
 .engine-progress progress::-webkit-progress-bar{background:#283a30;border-radius:8px}
