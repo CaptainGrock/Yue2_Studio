@@ -17,7 +17,8 @@
 .compat-info svg{width:13px;height:13px}
 .compat-info:hover::after{content:attr(data-tip);position:absolute;z-index:40;left:18px;top:-6px;width:min(320px,60vw);padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--sidebar,#141a17);color:var(--text);font-size:10px;line-height:1.5;box-shadow:0 14px 45px #0008;white-space:normal}
 .run-header-actions{display:flex;gap:8px;align-items:center;position:relative}
-.run-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:230px;display:flex;flex-direction:column;padding:6px;border:1px solid var(--border);border-radius:9px;background:var(--sidebar,#141a17);box-shadow:0 14px 45px #0008}
+.dialog-header,.dialog-body{position:relative}
+.run-menu{position:fixed;top:0;right:0;z-index:60;min-width:230px;display:flex;flex-direction:column;padding:6px;border:1px solid var(--border);border-radius:9px;background:var(--sidebar,#141a17);box-shadow:0 14px 45px #0008}
 .run-menu button{text-align:left;padding:8px 10px;border:0;background:transparent;color:var(--text);border-radius:6px;font-size:12px;cursor:pointer}
 .run-menu button:hover{background:var(--hover)}
 .log-actions{margin:6px 0;display:flex;justify-content:flex-end}
