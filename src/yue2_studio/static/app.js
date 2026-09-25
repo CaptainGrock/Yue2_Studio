@@ -194,9 +194,28 @@ async function loadRunTimemap(jobId){
 function syncRunCursor(){const player=$('runPlayer');
 /* timeupdate fires only ~4Hz, which can skip short notes; drive the cursor at display rate while playing. */
 if(player&&!player.paused){if(runScoreState._cursorRaf)cancelAnimationFrame(runScoreState._cursorRaf);runScoreState._cursorRaf=requestAnimationFrame(()=>{const p=$('runPlayer');if(p&&!p.paused)syncRunCursor();});}
-const timings=runScoreState.timings;if(!timings||!timings.length)return;const dur=player.duration;if(!dur||!isFinite(dur))return;const last=timings[timings.length-1].ms;if(!(last>0))return;const mapped=timemapScoreMs(player.currentTime);const scoreMs=mapped!=null?mapped:player.currentTime/dur*last;let lo=0,hi=timings.length-1,idx=0;while(lo<=hi){const mid=(lo+hi)>>1;if(timings[mid].ms<=scoreMs+0.5){idx=mid;lo=mid+1;}else hi=mid-1;}const t=timings[idx];const els=(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g.filter(e=>e&&e.classList):[]),[]);const key=t.ms+'#'+els.length;if(runScoreState.cursorKey===key&&runScoreState.cursorEls)return;if(runScoreState.cursorEls)runScoreState.cursorEls.forEach(e=>e.classList.remove('abc-playing'));runScoreState.cursorEls=els;runScoreState.cursorKey=key;els.forEach(e=>e.classList.add('abc-playing'));const box=$('runScoreSheet');const el=els[0];if(el&&el.getBoundingClientRect){const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();const inView=r.top>=b.top&&r.bottom<=b.bottom;if(!inView){if(r.bottom>b.bottom-24)box.scrollTop+=r.bottom-b.bottom-64;else if(r.top<b.top+24)box.scrollTop+=r.top-b.top+64;}}}function seekSheet(event){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');if(!player.duration||!isFinite(player.duration))return;const last=timings[timings.length-1].ms;if(!(last>0))return;let best=null,bd=Infinity;for(const t of timings){const el=t.elements&&t.elements[0]&&t.elements[0][0];if(!el||!el.getBoundingClientRect)continue;const r=el.getBoundingClientRect();const d=(r.left+r.width/2-event.clientX)**2+((r.top+r.height/2-event.clientY)**2)/4;if(d<bd){bd=d;best=t;}}if(best){const inv=timemapAudioMs(best.ms);player.currentTime=inv!=null?Math.min(player.duration-0.05,inv/1000):best.ms/last*player.duration;runScoreState.cursorKey=null;syncRunCursor();}}function syncRunEditor(){const editing=runScoreState.editing;const ed=$('runScoreEditor');if(ed)ed.classList.toggle('open',editing);const ew=$('runLyricsEditWrap');if(ew)ew.style.display=editing?'block':'none';const lt=$('runLyricsText');if(lt)lt.style.display=editing?'none':'block';setScoreDragging(true);}
-function setRunEditing(on){stopScorePreview();detachScoreDrag();runScoreState.editing=on;$('runEditBtn').textContent=on?'Close editor':'Edit score & lyrics';if(on){$('runScoreTa').value=runScoreState.abc;$('runLyricsEdit').value=runScoreState.lyrics;}else{runScoreState.lyrics=$('runLyricsEdit').value;if(runScoreState.overlay){runScoreState.baseAbc=stripLyricsFromAbc($('runScoreTa').value);applyRunOverlay();}else{runScoreState.abc=$('runScoreTa').value;renderRunScore();}}syncRunEditor();}
-async function startRerender(id){const abc=runScoreState.editing?$('runScoreTa').value:runScoreState.abc;const lyrics=runScoreState.editing&&$('runLyricsEdit').value.trim()?$('runLyricsEdit').value:'';if(!abc&&!lyrics)throw new Error('Edit the score or lyrics first.');const next=await api('/api/jobs/'+id+'/rerender',{abc,lyrics});state.activeId=next.id;runScoreState.editing=false;syncRunEditor();await openRun(next.id);await poll();toast('Re-render queued with your edits.');}
+const timings=runScoreState.timings;if(!timings||!timings.length)return;const dur=player.duration;if(!dur||!isFinite(dur))return;const last=timings[timings.length-1].ms;if(!(last>0))return;const mapped=timemapScoreMs(player.currentTime);const scoreMs=mapped!=null?mapped:player.currentTime/dur*last;let lo=0,hi=timings.length-1,idx=0;while(lo<=hi){const mid=(lo+hi)>>1;if(timings[mid].ms<=scoreMs+0.5){idx=mid;lo=mid+1;}else hi=mid-1;}const t=timings[idx];const els=(t.elements||[]).reduce((a,g)=>a.concat(Array.isArray(g)?g.filter(e=>e&&e.classList):[]),[]);const key=t.ms+'#'+els.length;if(runScoreState.cursorKey===key&&runScoreState.cursorEls)return;if(runScoreState.cursorEls)runScoreState.cursorEls.forEach(e=>e.classList.remove('abc-playing'));runScoreState.cursorEls=els;runScoreState.cursorKey=key;els.forEach(e=>e.classList.add('abc-playing'));const box=$('runScoreSheet');const el=els[0];
+if(el&&el.getBoundingClientRect){const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();
+  // Keep the active line in the upper third: clamp scroll instead of nudging,
+  // so the highlight never lingers at the bottom edge on line wraps.
+  const margin=90;
+  if(r.bottom>b.bottom-margin||r.top<b.top+margin){
+    const target=box.scrollTop+(r.top-b.top)-box.clientHeight*0.3;
+    const maxScroll=box.scrollHeight-box.clientHeight;
+    box.scrollTop=Math.max(0,Math.min(maxScroll,target));
+  }
+}}function seekSheet(event){const timings=runScoreState.timings;if(!timings||!timings.length)return;const player=$('runPlayer');if(!player.duration||!isFinite(player.duration))return;const last=timings[timings.length-1].ms;if(!(last>0))return;let best=null,bd=Infinity;for(const t of timings){const el=t.elements&&t.elements[0]&&t.elements[0][0];if(!el||!el.getBoundingClientRect)continue;const r=el.getBoundingClientRect();const d=(r.left+r.width/2-event.clientX)**2+((r.top+r.height/2-event.clientY)**2)/4;if(d<bd){bd=d;best=t;}}if(best){const inv=timemapAudioMs(best.ms);player.currentTime=inv!=null?Math.min(player.duration-0.05,inv/1000):best.ms/last*player.duration;runScoreState.cursorKey=null;syncRunCursor();}}function syncRunEditor(){const editing=runScoreState.editing;const ed=$('runScoreEditor');if(ed)ed.classList.toggle('open',editing);const ew=$('runLyricsEditWrap');if(ew)ew.style.display=editing?'block':'none';const lt=$('runLyricsText');if(lt)lt.style.display=editing?'none':'block';setScoreDragging(true);}
+function setRunEditing(on){stopScorePreview();detachScoreDrag();
+  const wasEditing=runScoreState.editing;
+  if(on&&wasEditing){const ed=$('runScoreEditor');if(ed)ed.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  runScoreState.editing=on;$('runEditBtn').textContent=on?'Close editor':'Edit score & lyrics';if(on){$('runScoreTa').value=runScoreState.abc;$('runLyricsEdit').value=runScoreState.lyrics;}else{runScoreState.lyrics=$('runLyricsEdit').value;if(runScoreState.overlay){runScoreState.baseAbc=stripLyricsFromAbc($('runScoreTa').value);applyRunOverlay();}else{runScoreState.abc=$('runScoreTa').value;renderRunScore();}}syncRunEditor();}
+async function startRerender(id){const editing=runScoreState.editing;const raw=editing?$('runScoreTa').value:runScoreState.abc;const lyrics=editing&&$('runLyricsEdit').value.trim()?$('runLyricsEdit').value:'';if(!raw&&!lyrics)throw new Error('Edit the score or lyrics first.');
+  // The displayed ABC may carry lyric overlay lines (w:), which fail the server's
+  // structural check. Send the clean score, plus the edited lyrics separately.
+  const abc=stripLyricsFromAbc(raw).trim();
+  if(!abc&&!lyrics)throw new Error('Edit the score or lyrics first.');
+  toast('Queuing re-render…');
+  const next=await api('/api/jobs/'+id+'/rerender',{abc,lyrics});state.activeId=next.id;runScoreState.editing=false;syncRunEditor();await openRun(next.id);await poll();toast('Re-render queued with your edits.');}
 function runSectionKey(id,part){return 'yue2-run-ui-v1:'+id+':'+part;}
 function runSectionOpen(id,part,fallback){
   try{const v=localStorage.getItem(runSectionKey(id,part));if(v!==null)return v==='1';}catch(e){}
@@ -224,7 +243,7 @@ function bindRunMenus(){
   edMenu.addEventListener('click',async e=>{
     const b=e.target.closest('button[data-edit]');if(!b)return;
     edMenu.hidden=true;const id=state.runId;if(!id)return;
-    if(b.dataset.edit==='editor')$('runEditBtn').click();
+    if(b.dataset.edit==='editor'){$('runEditBtn').click();const ed=$('runScoreEditor');if(ed)ed.scrollIntoView({behavior:'smooth',block:'start'});if($('runScoreTa'))$('runScoreTa').focus();}
     else if(b.dataset.edit==='rerender'){try{await startRerender(id);}catch(error){feedbackError(error);}}
     else if(b.dataset.edit==='load'){const job=state.jobs.find(j=>j.id===id);if(job)useRun(job,false);}
     else if(b.dataset.edit==='export'){const job=await api('/api/jobs/'+id);download('yue2-run-'+id.slice(0,8)+'.json',JSON.stringify(job.input,null,2));}
@@ -300,7 +319,18 @@ const masterLink=document.createElement('a');masterLink.href=artifactUrl(id,'res
 }else{
 const masterBtn=button('Master',async()=>{try{masterBtn.disabled=true;const result=await api('/api/jobs/'+id+'/master',{});toast('Mastered · glue '+result.metrics.glue_compression_db+' dB, peak '+result.metrics.mastered_peak_dbfs+' dBFS.');state.runSource='master';await updateRun();}catch(e){feedbackError(e);}finally{masterBtn.disabled=false;}},'primary small');masterBtn.title='Creates a mastered copy: gentle harshness taming, low warmth, glue compression, -1 dBFS peak. The original render stays untouched.';actions.append(masterBtn);}}
 if(hasAudio)$('runDownloadMenuBtn').hidden=false;if(job.abc){actions.append(button(job.kind==='transcription'?'Review melody in editor':'Use score in editor',()=>useRun(job,true),'primary small'));if($('runEditBtn').dataset.bound!=='1'){$('runEditBtn').onclick=()=>setRunEditing(!runScoreState.editing);$('runEditBtn').dataset.bound='1';}}if(job.kind==='generation'&&job.status!=='complete'&&job.status!=='needs_review')$('runEditMenuBtn').hidden=true;else if(job.kind==='generation')$('runEditMenuBtn').hidden=false;if(job.kind==='generation')actions.append(button('Load request & settings',()=>useRun(job,false)));actions.append(button('Export run input',()=>download('yue2-run-'+id.slice(0,8)+'.json',JSON.stringify(job.input,null,2))));if(job.kind==='generation'){const song={title:job.title,style:job.input.request.style,lyrics:job.input.request.lyrics,source:'generation_request',job_id:id};addLyricExports(actions,()=>song);$('runLyricsSection').hidden=false;$('runLyricsText').textContent=song.lyrics;if(runScoreState.editing)runScoreState.lyrics=song.lyrics||runScoreState.lyrics;else runScoreState.lyrics=song.lyrics;$('runLyricsEdit').value=runScoreState.lyrics;}else $('runLyricsSection').hidden=true;const links=$('artifactLinks');links.replaceChildren();for(const artifact of ['input.json','run.log',...(job.runtime_adjustments?['runtime_adjustments.json']:[]),...job.artifacts]){const link=document.createElement('a');link.href=artifactUrl(id,artifact);link.textContent=artifact.replace('result/','');link.download=artifact.split('/').at(-1);links.append(link);}}
-function useRun(job,withScore){const apply=()=>{if(job.kind==='transcription'){$('abc').value=job.abc;state.sourceJob=job.id;setMode('cover');$('scoreDetails').open=true;$('planMode').value=job.input.settings.transcription.task==='full'?'full':'melody';state.upload={upload_id:job.input.upload_id,name:job.title};updateUpload();}else{const input=job.input,request=input.request;restoreProject({title:input.title,...request,settings:input.settings,mode:input.mode,connection:undefined,instructions:$('writingInstructions').value});if(withScore)$('abc').value=job.abc;state.sourceJob=job.id;$('scoreDetails').open=Boolean($('abc').value);}updateMode();renderAbcSheet();message('scoreResult','Score copied into the editor. Check it before rendering; original artifacts are preserved.');$('runDialog').close();setRunEditing(false);switchView('create');save();toast('Run loaded into the editor.');};maybeReplace('Load this run into the editor?','This copies the selected run into your current draft. Save your project first if you want to keep the current version.',apply);}
+async function useRun(job,withScore){
+  const apply=async()=>{
+    let input=job.input;
+    if(!input){try{input=(await api('/api/jobs/'+job.id)).input;}catch(e){}}
+    if(!input){toast('This run has no saved request to load.',true);return;}
+    const source={...job,input};
+    if(job.kind==='transcription'){$('abc').value=input.request.abc||job.abc||'';state.sourceJob=job.id;setMode('cover');$('scoreDetails').open=true;$('planMode').value=(input.request.settings&&input.request.settings.transcription&&input.request.settings.transcription.task)==='full'?'full':'melody';state.upload={upload_id:input.request.upload_id,name:job.title};updateUpload();}
+    else{const request=input.request;restoreProject({title:input.title,...request,settings:input.settings,mode:input.mode,connection:undefined,instructions:$('writingInstructions').value});if(withScore)$('abc').value=job.abc;state.sourceJob=job.id;$('scoreDetails').open=Boolean($('abc').value);}
+    updateMode();renderAbcSheet();message('scoreResult','Score copied into the editor. Check it before rendering; original artifacts are preserved.');$('runDialog').close();setRunEditing(false);switchView('create');save();toast('Run loaded into the editor.');
+  };
+  maybeReplace('Load this run into the editor?','This copies the selected run into your current draft. Save your project first if you want to keep the current version.',apply);
+}
 async function poll(){if(polling||!state.boot)return;polling=true;try{const result=await api('/api/jobs');const changed=JSON.stringify(result.jobs)!==JSON.stringify(state.jobs);state.jobs=result.jobs;$('libraryCount').textContent=state.jobs.length;const running=state.jobs.find(j=>['running','cancelling'].includes(j.status));const pending=state.jobs.filter(j=>j.status==='queued');$('engineStatus').textContent=running?(running.kind==='trainer_setup'?'Model download active':'GPU job active'):pending.length?'Jobs queued':Object.values(state.boot.installed).every(Boolean)?'Local engine ready':'Check model paths';$('engineSub').textContent=running?(running.kind==='trainer_setup'?'Downloading full model weights':running.kind==='training'?'Training style LoRA':running.kind==='transcription'?'Transcribing source melody':'Rendering music')+' · '+pending.length+' queued':'YuE2 + SheetSage2';if(changed&&state.view==='library')renderLibrary();const active=state.jobs.find(j=>j.id===state.activeId)||running||pending[0];if(active){$('activeRun').hidden=false;$('activeTitle').textContent=active.title;$('activeStatus').textContent=(statusText[active.status]||active.status)+(active.error?' · '+active.error:'');const detail=await api('/api/jobs/'+active.id);renderProgress('activeProgress',detail);$('activeLog').textContent=detail.log.split('\n').slice(-6).join('\n');$('activeOpen').onclick=()=>openRun(active.id);}else $('activeRun').hidden=true;if($('runDialog').open&&state.runId)await updateRun();await pollSurprises();}catch(error){$('engineStatus').textContent='Studio disconnected';$('engineSub').textContent='Check the launcher window';}finally{polling=false;}}
 function bindShell(){bindLibraryDates();bindAppearance();document.querySelectorAll('[data-view]').forEach(el=>el.onclick=()=>switchView(el.dataset.view));$('librarySearch').oninput=renderLibrary;$('libraryFilter').onchange=renderLibrary;$('refreshLibrary').onclick=()=>busy('refreshLibrary',refreshLibraryJobs);if($('runnerNav'))$('runnerNav').onclick=()=>state.boot?openRunner():toast('Studio is still starting.',true);if($('advancedNav'))$('advancedNav').onclick=()=>state.boot?openSettings():toast('Studio is still starting.',true);if($('modelsNav'))$('modelsNav').onclick=()=>state.boot&&typeof openMusicModels==='function'?openMusicModels():toast('Music models are still starting.',true);if($('guideNav'))$('guideNav').onclick=()=>$('guideDialog').showModal();}
 async function init(){bindShell();try{state.boot=await api('/api/bootstrap');state.settings=clone(state.boot.defaults);bind();connectBrowserLifetime();if(!state.boot.profanity_check){const note=document.createElement('p');note.className='hint';note.textContent='Restart Studio after your current batch finishes to enable Require strong profanity.';$('surpriseProfanity').after(note);}$('compatibilityNote').textContent=state.boot.compatibility?.note||'';$('compatibilityNote').hidden=!state.boot.compatibility?.note;$('systemPrompt').textContent=state.boot.songwriter_prompt;const installed=Object.values(state.boot.installed).every(Boolean);$('engineStatus').textContent=installed?'Local engine ready':'Check model paths';$('engineSub').textContent=installed?'YuE2 + SheetSage2':'Open advanced settings';$('engineDot').classList.toggle('warning',!installed);try{const saved=localStorage.getItem('yue2-studio-draft-v1');if(saved){const data=JSON.parse(saved);const validated=await api('/api/settings/validate',data.settings||{});data.settings=validated.settings;restoreProject(data);}}catch(error){toast('The saved draft could not be restored: '+error.message,true);}updateCounts();updateRunnerBadge();try{if(typeof bindMusicModels==='function')bindMusicModels();}catch(error){toast('Music model controls could not start: '+error.message,true);}await poll();setInterval(poll,2500);}catch(error){$('engineStatus').textContent='Could not connect';$('engineSub').textContent='Start the Studio launcher';toast('Studio could not start: '+error.message,true);$('generateButton').disabled=true;$('planButton').disabled=true;$('assistButton').disabled=true;}}
@@ -489,6 +519,9 @@ function abcWithLyrics(text,lyrics){
     if(vm){inVocal=/^(Vocal|V)$/i.test(vm[1])&&!/inst/i.test(vm[1]);
       out.push(line);pos+=line.length+1;continue;}
     if(!inVocal||/^[ \t]*([A-Za-z]:|%)/.test(line)){out.push(line);pos+=line.length+1;continue;}
+    if(si>=syls.length){out.push(line);pos+=line.length+1;continue;}
+    // Lyrics exhausted: keep every remaining music line, just without w: lines.
+    // Breaking out here used to TRUNCATE the rest of the song from the text.
     const body=line;
     out.push(line);pos+=line.length+1;
     // w: tokens map 1:1 to EVERY slot in order - notes AND rests. Walk the
@@ -508,7 +541,6 @@ function abcWithLyrics(text,lyrics){
       insertions.push({pos,len:wl.length+1});
       out.push(wl);pos+=wl.length+1;
     }
-    if(si>=syls.length)break;
   }
   return{text:out.join('\n'),insertions,words:words.length,used:si};
 }
@@ -671,10 +703,12 @@ function detachScoreDrag(){
 function stopScorePreview(){
   runScoreState.previewOn=false;
   if(runScoreState.previewCtl){
-    try{runScoreState.previewCtl.stop();}catch(e){}
+    try{runScoreState.previewCtl.destroy();}catch(e){}
+    try{runScoreState.previewCtl.pause&&runScoreState.previewCtl.pause();}catch(e){}
     runScoreState.previewCtl=null;
   }
   previewCursorClear(runScoreState.previewCursor);
+  if(runScoreState._pvWatch){try{clearInterval(runScoreState._pvWatch);}catch(e){}runScoreState._pvWatch=null;runScoreState._pvLastMs=0;runScoreState._pvStalls=0;}
   const ctlBox=$('runPreviewCtl');
   if(ctlBox){ctlBox.hidden=true;ctlBox.innerHTML='';}
   const st=$('runPreviewStatus');
@@ -685,6 +719,9 @@ function stopScorePreview(){
 async function startScorePreview(){
   if(!runScoreState.editing)return;
   if(runScoreState.previewOn){stopScorePreview();return;}
+  // Tear down any previous synth first: stacked SynthControllers fight over
+  // the shared AudioContext, garble playback and make the cursor jump around.
+  if(runScoreState.previewCtl){stopScorePreview();}
   const st=$('runPreviewStatus');
   const show=(msg,warn)=>{st.hidden=!msg;st.textContent=msg||'';st.style.color=warn?'var(--danger,#e06c75)':'';};
   if(!window.ABCJS||!ABCJS.synth||!ABCJS.synth.SynthController){show('abcjs synth is not available in this build.',true);return;}
@@ -705,14 +742,33 @@ async function startScorePreview(){
     ctl=new ABCJS.synth.SynthController();
     ctl.load('#runPreviewCtl',{onEvent:runPreviewOnEvent},{displayPlayButton:true,displayRestart:true,displayProgress:true});
     await ctl.setTune(visual[0],false,{soundFontUrl:window.location.origin+'/soundfont/',chordsOff:true,drumOff:true});
-    ctl.play();
     runScoreState.previewCtl=ctl;
     runScoreState.previewOn=true;
+    ctl.play();
     $('runStopPreviewBtn').hidden=false;
     show('Piano preview of your edits \u2014 this is not the real render. Stop preview or close the editor to end it.');
+    // Some abcjs builds drop their scheduled audio partway through long scores;
+    // watch progress and restart from the stall point if the timer freezes.
+    const watch=window.setInterval(()=>{
+      const cur=runScoreState.previewCtl;
+      if(cur!==ctl){clearInterval(watch);return;}
+      const t=ctl.timer;
+      if(!t){clearInterval(watch);return;}
+      if(t.isPaused)return;
+      const ms=t.currentTime||0;
+      if(ms<runScoreState._pvLastMs+50){
+        runScoreState._pvStalls=(runScoreState._pvStalls||0)+1;
+        if(runScoreState._pvStalls>=2&&ms<runScoreState.totalMs-500){
+          runScoreState._pvStalls=0;
+          try{ctl.seek(Math.min(1,(ms+50)/runScoreState.totalMs));}catch(e){}
+        }
+      }else runScoreState._pvStalls=0;
+      runScoreState._pvLastMs=ms;
+    },500);
+    runScoreState._pvWatch=watch;
   }catch(err){
     show('Preview failed: '+((err&&err.message)||err),true);
-    try{ctl&&ctl.stop();}catch(e){}
+    try{ctl&&ctl.stop&&ctl.stop();}catch(e){}
     if(ctlBox){ctlBox.hidden=true;ctlBox.innerHTML='';}
   }
 }
@@ -963,8 +1019,12 @@ function previewCursorApply(bag,entry,boxId){
   const el=els[0];
   if(box&&el&&el.getBoundingClientRect){
     const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();
-    if(r.top<b.top+8)box.scrollTop+=r.top-b.top+48;
-    else if(r.bottom>b.bottom-8)box.scrollTop+=r.bottom-b.bottom-48;
+    const margin=90;
+    if(r.bottom>b.bottom-margin||r.top<b.top+margin){
+      const target=box.scrollTop+(r.top-b.top)-box.clientHeight*0.3;
+      const maxScroll=box.scrollHeight-box.clientHeight;
+      box.scrollTop=Math.max(0,Math.min(maxScroll,target));
+    }
   }
 }
 function previewCursorClear(bag){

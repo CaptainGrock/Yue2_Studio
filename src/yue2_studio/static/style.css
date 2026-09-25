@@ -105,7 +105,7 @@
 .score-sheet svg g.abc-playing path{fill:#0a8f54}
 .score-sheet svg g.abc-playing text{fill:#0a8f54}
 #runScoreHint{margin:8px 0;color:#e6d6a9}
-#runScoreEditor{display:none;margin:10px 0}
+#runScoreAbcDetails{margin:4px 0 8px}#runScoreAbcDetails summary{font-size:10px;color:var(--muted);padding:6px 0;cursor:pointer}#runScoreAbcDetails pre{margin-top:6px}#runScoreEditor{display:none;margin:10px 0}
 #runScoreEditor.open{display:block}
 #runScoreEditor textarea{font-family:'Cascadia Code',Consolas,monospace;font-size:11px;line-height:1.6;min-height:220px}
 #runLyricsEditWrap{display:none;margin-top:10px}

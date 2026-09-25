@@ -22,8 +22,8 @@ if str(_SCRIPTS) not in sys.path:
 FRAME = 512          # samples per onset-envelope frame at 44.1kHz (~11.6ms)
 SMOOTH = 9           # envelope smoothing window (frames)
 MIN_SPACING = 0.25   # seconds between distinct onsets
-ANCHOR_SPACING = 8.0 # target seconds between anchors
-TOLERANCE = 2.5      # seconds: max |audio-skeleton - score-time| for an anchor
+ANCHOR_SPACING = 2.0  # target seconds between anchors (denser = steadier sync)
+TOLERANCE = 0.6       # seconds: max |audio-skeleton - score-time| for an anchor
 
 
 def _onset_envelope(samples, samplerate):
@@ -133,6 +133,7 @@ def build(job_dir: Path):
     score_dur = score_onsets[-1] + 1.0
     scale = audio_dur / score_dur
     anchors = []
+    last_audio = -1.0
     si = 0
     while si < len(score_onsets):
         t_score = score_onsets[si]
@@ -140,7 +141,9 @@ def build(job_dir: Path):
         window = [p for p in audio_peaks if abs(p - expected) <= TOLERANCE]
         if window:
             p = min(window, key=lambda q: abs(q - expected))
-            anchors.append((p, t_score))
+            if p > last_audio:  # anchors must advance in audio time
+                anchors.append((p, t_score))
+                last_audio = p
             # Skip ahead to keep anchors spread out
             while si < len(score_onsets) and score_onsets[si] < t_score + ANCHOR_SPACING:
                 si += 1
@@ -151,13 +154,47 @@ def build(job_dir: Path):
         anchors = [(0.0, 0.0), (audio_dur, score_dur)]
     else:
         anchors = [(0.0, 0.0)] + anchors + [(audio_dur, score_dur)]
-    # Sort by audio time and drop non-monotonic pairs
-    anchors.sort(key=lambda a: a[0])
+    # Sort by audio time and drop non-monotonic pairs (also dedupes the
+    # synthetic endpoints if a matched anchor landed at 0 or audio_dur).
+    anchors.sort(key=lambda a: (a[0], a[1]))
     clean = [anchors[0]]
     for a in anchors[1:]:
-        if a[1] > clean[-1][1]:
+        if a[1] > clean[-1][1] and a[0] > clean[-1][0]:
             clean.append(a)
     anchors = clean
+    # Second pass: re-match onsets against the coarse map instead of the raw
+    # global scale. Local stretches the coarse map absorbed (ritardandi, phrase
+    # gaps) no longer push expected times off the real peaks, so far more
+    # onsets land within tolerance.
+    coarse = anchors
+    def _score_to_audio(s):
+        xs = [c[1] for c in coarse]; ys = [c[0] for c in coarse]
+        return float(np.interp(s, xs, ys))
+    fine = []
+    last_audio = -1.0
+    si = 0
+    while si < len(score_onsets):
+        t_score = score_onsets[si]
+        expected = _score_to_audio(t_score)
+        window = [p for p in audio_peaks if abs(p - expected) <= TOLERANCE]
+        if window:
+            p = min(window, key=lambda q: abs(q - expected))
+            if p > last_audio:
+                fine.append((p, t_score))
+                last_audio = p
+            while si < len(score_onsets) and score_onsets[si] < t_score + ANCHOR_SPACING:
+                si += 1
+        else:
+            si += 1
+    if len(fine) >= 4:
+        fine = [(0.0, 0.0)] + fine + [(audio_dur, score_dur)]
+        fine.sort(key=lambda a: (a[0], a[1]))
+        clean = [fine[0]]
+        for a in fine[1:]:
+            if a[1] > clean[-1][1] and a[0] > clean[-1][0]:
+                clean.append(a)
+        if len(clean) >= 4:
+            anchors = clean
     out = {
         'anchors': [[round(a, 3), round(b, 3)] for a, b in anchors],
         'audio_duration': round(audio_dur, 3),
