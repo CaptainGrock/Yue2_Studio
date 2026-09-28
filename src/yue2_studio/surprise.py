@@ -15,7 +15,27 @@ VOICES = {'any':'Choose a suitable lead vocal type.', 'instrumental':'Instrument
           'female':'Female vocal.', 'male':'Male vocal.',
           'powerful_female':'Powerful, belting female lead vocal.', 'powerful_male':'Powerful, belting male lead vocal.',
           'duet':'Male and female vocal duet.', 'breathy_female':'Soft, breathy female lead vocal.',
-          'raspy_male':'Raspy, gravelly male lead vocal.', 'group':'Group vocal / choir with layered voices.'}
+          'raspy_male':'Raspy, gravelly male lead vocal.', 'group':'Group vocal / choir with layered voices.',
+          'male_group':'All-male group / male choir, layered male voices only, no female voices.',
+          'female_group':'All-female group / female choir, layered female voices only, no male voices.',
+          'mixed_group':'Mixed-voice choir with both male and female voices singing together.'}
+# Voice choices the renderer must not contradict. Group/choir options carry extra
+# weight because YuE2 tends to collapse them to a single lead singer unless the
+# style repeats the multi-voice requirement.
+VOICE_ENFORCEMENT = {
+    'group':'MANDATORY: This song MUST be sung by a GROUP/CHOIR of multiple layered voices, never a single lead singer. Every section of the style you invent must describe the ensemble (e.g. layered harmonies, multiple singers). Do not write a style for a solo vocalist. In the lyrics, do not write performance directions naming a single singer.',
+    'male_group':'MANDATORY: This song MUST be sung by an ALL-MALE GROUP / MALE CHOIR of multiple layered male voices, never a solo singer and never any female voice. Every section of the style you invent must describe the male ensemble (e.g. layered male harmonies, multiple male singers). In the lyrics, do not write performance directions naming a single singer or a female voice.',
+    'female_group':'MANDATORY: This song MUST be sung by an ALL-FEMALE GROUP / FEMALE CHOIR of multiple layered female voices, never a solo singer and never any male voice. Every section of the style you invent must describe the female ensemble (e.g. layered female harmonies, multiple female singers). In the lyrics, do not write performance directions naming a single singer or a male voice.',
+    'mixed_group':'MANDATORY: This song MUST be sung by a MIXED-VOICE CHOIR combining male and female voices singing together, never a solo singer. Every section of the style you invent must describe the mixed ensemble (e.g. SATB harmonies, men and women singing in layers). In the lyrics, do not write performance directions naming a single singer.',
+    'instrumental':'MANDATORY: This is an INSTRUMENTAL song with no vocals at all. Do not include vocalists, singers, or sung lyrics in the style.',
+    'female':'MANDATORY: Lead vocal is FEMALE. Do not describe male vocalists in the style.',
+    'male':'MANDATORY: Lead vocal is MALE. Do not describe female vocalists in the style.',
+    'powerful_female':'MANDATORY: Lead vocal is a POWERFUL, BELTING FEMALE voice. Do not describe male vocalists in the style.',
+    'powerful_male':'MANDATORY: Lead vocal is a POWERFUL, BELTING MALE voice. Do not describe female vocalists in the style.',
+    'breathy_female':'MANDATORY: Lead vocal is a SOFT, BREATHY FEMALE voice. Do not describe male vocalists in the style.',
+    'raspy_male':'MANDATORY: Lead vocal is a RASPY, GRAVELLY MALE voice. Do not describe female vocalists in the style.',
+    'duet':'MANDATORY: Vocals are a MALE AND FEMALE DUET singing together. Do not describe a solo vocalist in the style.'
+}
 IDEAS = [
     'an unexpected reunion', 'a small act of courage', 'leaving a familiar place',
     'finding humor in a bad day', 'a secret finally shared', 'a friendship across distance',
@@ -147,7 +167,8 @@ class SurpriseManager:
                 brief=(f'Create original song {index+1} of {record["count"]}. Fully invent its title, lyrics and musical style. '
                        'Return a complete, singable song with a developed second verse, repeated chorus and intentional ending. '
                        f'Vocal requirement: {VOICES[record["voice"]]} '
-                       f'Language: {options["language"] or "Choose freely"}. '
+                       +(VOICE_ENFORCEMENT.get(record["voice"],'')+' ' if record['voice']!='any' else '')
+                       +f'Language: {options["language"] or "Choose freely"}. '
                        f'Style constraint: {options["style"] or "Choose a fresh, coherent genre and arrangement"}. '
                        f'User direction: {options["brief"] or "Surprise me"}. '
                        f'Optional creative starting point: {ideas[index % len(ideas)]}. '
@@ -202,7 +223,13 @@ class SurpriseManager:
                        (record['voice']!='instrumental' and draft['lyrics'].strip()==p['lyrics']) for p in previous):
                     raise ValueError('The LLM repeated an earlier song. This batch was stopped to avoid rendering duplicates.')
                 style=options['style'] if record.get('lock_style') else draft['style']
-                if record['voice']!='any':style=VOICES[record['voice']]+' '+style
+                if record['voice']!='any':
+                    style=VOICES[record['voice']]+' '+style
+                    # Repeat the requirement at the END of the style too: the audio
+                    # model weights recent tokens heavily, and a lone prefix mention
+                    # can be diluted by long genre/arrangement text after it.
+                    enforce=VOICE_ENFORCEMENT.get(record['voice'])
+                    if enforce:style+=' '+enforce.replace('MANDATORY: ','')
                 # Empty lyrics invite the composer to invent its own sung words; the
                 # native protocol expects minimal section cues for instrumentals instead.
                 lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n' if record['voice']=='instrumental' else draft['lyrics']
