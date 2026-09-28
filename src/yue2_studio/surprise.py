@@ -11,9 +11,11 @@ from . import llm_server
 from .jobs import now, write_json
 from .settings import validate_settings
 
-VOICES = {'any':'Choose a suitable lead vocal gender.', 'female':'Female lead vocal.',
-          'male':'Male lead vocal.', 'duet':'Female and male vocal duet.',
-          'instrumental':'Instrumental only, no vocals.'}
+VOICES = {'any':'Choose a suitable lead vocal type.', 'instrumental':'Instrumental only, no vocals.',
+          'female':'Female vocal.', 'male':'Male vocal.',
+          'powerful_female':'Powerful, belting female lead vocal.', 'powerful_male':'Powerful, belting male lead vocal.',
+          'duet':'Male and female vocal duet.', 'breathy_female':'Soft, breathy female lead vocal.',
+          'raspy_male':'Raspy, gravelly male lead vocal.', 'group':'Group vocal / choir with layered voices.'}
 IDEAS = [
     'an unexpected reunion', 'a small act of courage', 'leaving a familiar place',
     'finding humor in a bad day', 'a secret finally shared', 'a friendship across distance',
