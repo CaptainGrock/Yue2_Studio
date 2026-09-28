@@ -54,7 +54,7 @@ class SurpriseManager:
             return deepcopy(sorted(self.records.values(),key=lambda r:r['created'],reverse=True))
 
     def start(self, payload):
-        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity','lock_style','length'}:
+        if set(payload)-{'count','voice','style','language','brief','instructions','cot','settings','connection','profanity','lock_style','length','custom_length'}:
             raise ValueError('Unknown Surprise me options.')
         lock_style=payload.get('lock_style',False)
         if type(lock_style) is not bool:
@@ -66,8 +66,15 @@ class SurpriseManager:
         cot=payload.get('cot','full')
         profanity=payload.get('profanity','prompt')
         length=payload.get('length','default')
-        if length not in ('short','default'):
+        if length not in ('short','default','medium','long','custom'):
             raise ValueError('Choose a supported song length.')
+        custom_length=payload.get('custom_length')
+        if length=='custom':
+            if type(custom_length) is not int or not 60<=custom_length<=720:
+                raise ValueError('Custom length must be 60–720 seconds.')
+            custom_length=(custom_length//15)*15
+        else:
+            custom_length=None
         if profanity not in ('prompt','required'):
             raise ValueError('Choose a supported profanity setting.')
         if profanity=='required' and voice=='instrumental':
@@ -92,7 +99,7 @@ class SurpriseManager:
             if any(r['status'] in ACTIVE for r in self.records.values()):
                 raise ValueError('A surprise batch is already active. Finish or stop it before starting another.')
             record=dict(id=uuid.uuid4().hex,created=now(),status='queued',count=count,voice=voice,profanity=profanity,
-                        cot=cot,lock_style=lock_style,length=length,options=options,settings=settings,provider=connection['provider'],
+                        cot=cot,lock_style=lock_style,length=length,custom_length=custom_length,options=options,settings=settings,provider=connection['provider'],
                         model=connection['model'],songs=[],current=0)
             self.records[record['id']]=record
             event=threading.Event()
@@ -156,6 +163,17 @@ class SurpriseManager:
                     brief += (' SONG LENGTH: keep it SHORT, roughly one minute of music. Write at most about 150 words of lyrics '
                              '(a short verse and one chorus, or an instrumental-style piece with minimal lyrics). No bridge, no second verse, '
                              'no extended outro. End the song cleanly; do not pad sections.')
+                elif record.get('length')=='medium':
+                    brief += ' SONG LENGTH: aim for roughly three minutes of music - a normal radio-length song with verse/chorus structure and a brief bridge or outro.'
+                elif record.get('length')=='long':
+                    brief += ' SONG LENGTH: aim for roughly four minutes of music - developed verses, a bridge, and an intentional extended ending.'
+                elif record.get('length')=='custom':
+                    seconds=int(record.get('custom_length') or 300)
+                    minutes=max(1,round(seconds/60))
+                    brief += (f' SONG LENGTH: aim for roughly {minutes} minutes ({seconds} seconds) of music. '
+                             +('Write extended lyrics with additional verses, repeats and a long instrumental or outro section to fill the duration.' if seconds>240
+                               else 'Write lyrics sized to fill the requested duration.')
+                             +' Do not pad with repeated empty sections.')
                 acquired=False
                 try:
                     while not event.is_set():
@@ -195,6 +213,13 @@ class SurpriseManager:
                     # later exhaust VRAM during synthesis.
                     batch_settings['abc']['max_tokens']=min(int(batch_settings['abc'].get('max_tokens') or 4096),1536)
                     batch_settings['abc']['min_tokens']=min(int(batch_settings['abc'].get('min_tokens') or 32),64)
+                elif record.get('length')=='custom':
+                    # Scale the plan budget with the requested duration so long custom
+                    # songs get enough tokens (roughly 4096 tokens per 4 minutes).
+                    seconds=int(record.get('custom_length') or 300)
+                    budget=max(1536,min(8192,int(seconds/240*4096)))
+                    batch_settings['abc']['max_tokens']=min(int(batch_settings['abc'].get('max_tokens') or 8192),budget)
+                    batch_settings['abc']['min_tokens']=min(int(batch_settings['abc'].get('min_tokens') or 32),max(64,budget//32))
                 spec={'title':draft['title'],'mode':'create','stage':'audio',
                       'source_job':f'surprise:{batch_id}:{index+1}', 'settings':batch_settings,
                       'request':{'style':style,'lyrics':lyrics,'cot':record['cot'],'seed':secrets.randbits(63)}}
