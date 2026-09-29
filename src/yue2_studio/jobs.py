@@ -108,6 +108,18 @@ def generation_spec(payload):
     stage = payload.get('stage','audio')
     if mode not in ('create','cover') or stage not in ('audio','plan'):
         raise ValueError('Unsupported workflow or stage.')
+    if not str(payload.get('source_job') or '').startswith('surprise:'):
+        # Surprise batches deliberately scale the planner token budget to the
+        # requested song length (e.g. 1536 tokens for a one-minute song). Those
+        # caps are batch-only, but they used to ride along when a batch run was
+        # retried, re-rendered or loaded into the create view, silently
+        # truncating every later full-length plan mid-score. An interactive
+        # render always plans a full song: restore at least the default budgets
+        # regardless of what stale settings arrived.
+        if int(settings['abc'].get('max_tokens') or 0) < 4096:
+            settings['abc']['max_tokens'] = 4096
+        if int(settings['semantic'].get('max_tokens') or 0) < 9000:
+            settings['semantic']['max_tokens'] = 9000
     if settings['runtime']['backend']=='audio.cpp':
         from .gguf import validate
         validate(settings,stage)
