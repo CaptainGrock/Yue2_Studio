@@ -146,3 +146,8 @@
 #abcToggle{align-self:flex-start;margin:0 0 6px;font-size:12px;padding:4px 10px}
 /* Lyrics aligned under vocal notes (display-only overlay) */
 .score-sheet svg text.abc-lyric{fill:#8fc7ee;font-size:12px}
+/* Engine controls live in the Engine settings dialog, not the create view */
+#advancedDialog .music-engine-bar{margin:0 0 12px;padding:14px 18px}
+#advancedDialog .gpu-preset-bar{margin:0;padding:14px 18px}
+#advancedDialog .settings-toolbar{margin-bottom:14px}
+#scoreActiveBanner .button{margin:2px 0}

@@ -67,6 +67,10 @@ function updateSuppliedScoreNotice(hasScore){
   // because a leftover score silently produces the same melody every render.
   const banner=$('scoreActiveBanner');if(banner)banner.hidden=!hasScore;
   const details=$('scoreDetails');if(details&&hasScore)details.open=true;
+  if(typeof clearSuppliedScore!=='undefined'&&!clearSuppliedScore.dataset.bound){
+    clearSuppliedScore.dataset.bound='1';
+    clearSuppliedScore.onclick=()=>{if($('abc').value.trim()){maybeReplace('Clear the supplied score?','The planner will compose a fresh melody for each render again. The score stays available in the original run artifacts; copy it back from the library if needed.',()=>{$('abc').value='';renderAbcSheet();message('scoreResult','Score cleared. The planner now invents a fresh composition every render.');save();toast('Planner restored: new seeds and styles will compose new melodies.');});}};
+  }
 }
 function hasSong(){return Boolean($('style').value.trim()||$('lyrics').value.trim()||$('abc').value.trim());}
 function confirmReplace(title,text,fn){$('confirmTitle').textContent=title;$('confirmText').textContent=text;restoreCallback=fn;$('confirmDialog').showModal();}
