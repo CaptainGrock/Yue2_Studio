@@ -19,23 +19,60 @@ VOICES = {'any':'Choose a suitable lead vocal type.', 'instrumental':'Instrument
           'male_group':'All-male group / male choir, layered male voices only, no female voices.',
           'female_group':'All-female group / female choir, layered female voices only, no male voices.',
           'mixed_group':'Mixed-voice choir with both male and female voices singing together.'}
-# Voice choices the renderer must not contradict. Group/choir options carry extra
-# weight because YuE2 tends to collapse them to a single lead singer unless the
-# style repeats the multi-voice requirement.
+# The audio model conditions vocal identity mainly on the [Tags] style text, and it
+# follows phrasing that resembles its training distribution: a comma-separated tag
+# list where the vocal descriptor appears EARLY and uses concrete voice terms. It
+# largely ignores instructions like "MANDATORY" inside the style, so enforcement
+# uses short natural tags repeated first and last instead.
+VOICE_TAG = {
+    'instrumental':'no vocals, instrumental only',
+    'female':'expressive female voice',
+    'male':'warm male voice',
+    'powerful_female':'powerful belting female voice',
+    'powerful_male':'powerful belting male voice',
+    'breathy_female':'soft breathy female voice',
+    'raspy_male':'raspy gravelly male voice',
+    'duet':'male and female vocal duet, alternating lead vocals',
+    'group':'group vocals, layered choir harmonies, multiple singers',
+    'male_group':'male choir, TTBB, layered male harmony vocals, no female voices',
+    'female_group':'female choir, layered female harmony vocals, no male voices',
+    'mixed_group':'mixed-voice choir, SATB, men and women singing in harmony'}
+# Short closing reinforcement for the style text. Kept in the same natural tag
+# register as VOICE_TAG because instruction-style sentences are weakly attended.
+VOICE_TAG_SUFFIX = {
+    'instrumental':'instrumental song, no singing',
+    'female':'female lead vocal, no male vocals',
+    'male':'male lead vocal, no female vocals',
+    'powerful_female':'powerful female lead vocal, no male vocals',
+    'powerful_male':'powerful male lead vocal, no female vocals',
+    'breathy_female':'breathy female lead vocal, no male vocals',
+    'raspy_male':'raspy male lead vocal, no female vocals',
+    'duet':'vocal duet, one male and one female singer',
+    'group':'performed by a vocal group, never a solo singer',
+    'male_group':'performed by an all-male vocal group, no solo singer, no female vocals',
+    'female_group':'performed by an all-female vocal group, no solo singer, no male vocals',
+    'mixed_group':'performed by a mixed-voice choir, men and women together, never a solo singer'}
+# Register guidance the writing LLM must observe when drafting lyrics. The ABC
+# planner derives its vocal melody register from the lyrics' implied singer, so a
+# high-register or falsely gendered persona leaks into the render and can collapse
+# a male-voice request to the model's more common female timbre.
+VOICE_LYRIC_DIRECTION = {
+    'instrumental':'The song is instrumental: write no sung words.',
+    'female':'Write for a female singer; keep the implied vocal register in the alto range.',
+    'male':'Write for a MALE singer. Keep the implied vocal register in the tenor or baritone range; do not describe a female singer or use a female persona anywhere in the lyrics or section notes.',
+    'powerful_female':'Write for a powerful female singer; keep the implied vocal register in the mezzo-soprano range.',
+    'powerful_male':'Write for a powerful male singer. Keep the implied vocal register in the tenor range; do not describe a female singer anywhere in the lyrics.',
+    'breathy_female':'Write for a soft breathy female singer; keep the implied vocal register in the mezzo-soprano range.',
+    'raspy_male':'Write for a raspy male singer. Keep the implied vocal register in the baritone range; do not describe a female singer anywhere in the lyrics.',
+    'duet':'Write for one male and one female singer trading lines; mark who sings each section in performance notes.',
+    'group':'Write for a group of several singers; mark ensemble sections in performance notes, never a single named singer.',
+    'male_group':'Write for an ALL-MALE group of several singers (male choir). Every performance note must describe male voices in ensemble; never mention a female singer and never write a solo-artist persona.',
+    'female_group':'Write for an ALL-FEMALE group of several singers (female choir). Every performance note must describe female voices in ensemble; never mention a male singer and never write a solo-artist persona.',
+    'mixed_group':'Write for a mixed choir of men and women; performance notes must describe the full ensemble, never a single named singer.'}
+# Kept for compatibility with records that stored enforcement text; new batches
+# use VOICE_TAG/VOICE_TAG_SUFFIX.
 VOICE_ENFORCEMENT = {
-    'group':'MANDATORY: This song MUST be sung by a GROUP/CHOIR of multiple layered voices, never a single lead singer. Every section of the style you invent must describe the ensemble (e.g. layered harmonies, multiple singers). Do not write a style for a solo vocalist. In the lyrics, do not write performance directions naming a single singer.',
-    'male_group':'MANDATORY: This song MUST be sung by an ALL-MALE GROUP / MALE CHOIR of multiple layered male voices, never a solo singer and never any female voice. Every section of the style you invent must describe the male ensemble (e.g. layered male harmonies, multiple male singers). In the lyrics, do not write performance directions naming a single singer or a female voice.',
-    'female_group':'MANDATORY: This song MUST be sung by an ALL-FEMALE GROUP / FEMALE CHOIR of multiple layered female voices, never a solo singer and never any male voice. Every section of the style you invent must describe the female ensemble (e.g. layered female harmonies, multiple female singers). In the lyrics, do not write performance directions naming a single singer or a male voice.',
-    'mixed_group':'MANDATORY: This song MUST be sung by a MIXED-VOICE CHOIR combining male and female voices singing together, never a solo singer. Every section of the style you invent must describe the mixed ensemble (e.g. SATB harmonies, men and women singing in layers). In the lyrics, do not write performance directions naming a single singer.',
-    'instrumental':'MANDATORY: This is an INSTRUMENTAL song with no vocals at all. Do not include vocalists, singers, or sung lyrics in the style.',
-    'female':'MANDATORY: Lead vocal is FEMALE. Do not describe male vocalists in the style.',
-    'male':'MANDATORY: Lead vocal is MALE. Do not describe female vocalists in the style.',
-    'powerful_female':'MANDATORY: Lead vocal is a POWERFUL, BELTING FEMALE voice. Do not describe male vocalists in the style.',
-    'powerful_male':'MANDATORY: Lead vocal is a POWERFUL, BELTING MALE voice. Do not describe female vocalists in the style.',
-    'breathy_female':'MANDATORY: Lead vocal is a SOFT, BREATHY FEMALE voice. Do not describe male vocalists in the style.',
-    'raspy_male':'MANDATORY: Lead vocal is a RASPY, GRAVELLY MALE voice. Do not describe female vocalists in the style.',
-    'duet':'MANDATORY: Vocals are a MALE AND FEMALE DUET singing together. Do not describe a solo vocalist in the style.'
-}
+    voice:('MANDATORY: '+VOICE_TAG_SUFFIX[voice].capitalize()+'.') for voice in VOICE_TAG_SUFFIX}
 IDEAS = [
     'an unexpected reunion', 'a small act of courage', 'leaving a familiar place',
     'finding humor in a bad day', 'a secret finally shared', 'a friendship across distance',
@@ -46,6 +83,23 @@ IDEAS = [
     'a memory triggered by an everyday object', 'forgiving your younger self',
     'the excitement before a first meeting', 'an invitation to dance', 'a quiet rebellion',
 ]
+def voice_style_enhancement(style, voice):
+    """Compose the final [Tags] style for a chosen voice, shared by the Surprise
+    batches and the create panel. The audio model weights early style tokens
+    most, so the vocal descriptor leads; a closing suffix reinforces it."""
+    if voice not in VOICE_TAG:
+        return style
+    return ', '.join(filter(None,[VOICE_TAG[voice],style,VOICE_TAG_SUFFIX[voice]]))
+
+
+def voice_cfg(voice, settings):
+    """Modest guidance bump for chosen voices so the audio model adheres to the
+    vocal tags, without the quality loss of high CFG values."""
+    if voice not in VOICE_TAG:
+        return None
+    return max(1.05, (settings.get('generation',{}) or {}).get('cfg_scale') or 1.05)
+
+
 ACTIVE = {'queued','writing','rendering','cancelling'}
 
 
@@ -167,7 +221,7 @@ class SurpriseManager:
                 brief=(f'Create original song {index+1} of {record["count"]}. Fully invent its title, lyrics and musical style. '
                        'Return a complete, singable song with a developed second verse, repeated chorus and intentional ending. '
                        f'Vocal requirement: {VOICES[record["voice"]]} '
-                       +(VOICE_ENFORCEMENT.get(record["voice"],'')+' ' if record['voice']!='any' else '')
+                       +(VOICE_LYRIC_DIRECTION[record['voice']]+' ' if record['voice']!='any' else '')
                        +f'Language: {options["language"] or "Choose freely"}. '
                        f'Style constraint: {options["style"] or "Choose a fresh, coherent genre and arrangement"}. '
                        f'User direction: {options["brief"] or "Surprise me"}. '
@@ -223,17 +277,14 @@ class SurpriseManager:
                        (record['voice']!='instrumental' and draft['lyrics'].strip()==p['lyrics']) for p in previous):
                     raise ValueError('The LLM repeated an earlier song. This batch was stopped to avoid rendering duplicates.')
                 style=options['style'] if record.get('lock_style') else draft['style']
-                if record['voice']!='any':
-                    style=VOICES[record['voice']]+' '+style
-                    # Repeat the requirement at the END of the style too: the audio
-                    # model weights recent tokens heavily, and a lone prefix mention
-                    # can be diluted by long genre/arrangement text after it.
-                    enforce=VOICE_ENFORCEMENT.get(record['voice'])
-                    if enforce:style+=' '+enforce.replace('MANDATORY: ','')
-                # Empty lyrics invite the composer to invent its own sung words; the
-                # native protocol expects minimal section cues for instrumentals instead.
-                lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n' if record['voice']=='instrumental' else draft['lyrics']
                 batch_settings=deepcopy(record['settings'])
+                if record['voice']!='any':
+                    # Tag-first style assembly (shared helper).
+                    style=voice_style_enhancement(style,record['voice'])
+                    # A modest guidance bump above the 1.0 default makes the audio
+                    # model adhere to the vocal tags without the quality loss of
+                    # high CFG values.
+                    batch_cfg=voice_cfg(record['voice'],batch_settings)
                 if record.get('length')=='short':
                     # A full 4096-token plan is several minutes of music; a one-minute
                     # song only needs a fraction. The cap prevents runaway plans that
@@ -247,9 +298,14 @@ class SurpriseManager:
                     budget=max(1536,min(8192,int(seconds/240*4096)))
                     batch_settings['abc']['max_tokens']=min(int(batch_settings['abc'].get('max_tokens') or 8192),budget)
                     batch_settings['abc']['min_tokens']=min(int(batch_settings['abc'].get('min_tokens') or 32),max(64,budget//32))
+                # Empty lyrics invite the composer to invent its own sung words; the
+                # native protocol expects minimal section cues for instrumentals instead.
+                lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n' if record['voice']=='instrumental' else draft['lyrics']
+                request={'style':style,'lyrics':lyrics,'cot':record['cot'],'seed':secrets.randbits(63)}
+                if record['voice']!='any':request['cfg_scale']=batch_cfg
                 spec={'title':draft['title'],'mode':'create','stage':'audio',
                       'source_job':f'surprise:{batch_id}:{index+1}', 'settings':batch_settings,
-                      'request':{'style':style,'lyrics':lyrics,'cot':record['cot'],'seed':secrets.randbits(63)}}
+                      'request':request}
                 # Lock prevents a stop request from slipping between submission and ownership.
                 with self.lock:
                     if event.is_set():break

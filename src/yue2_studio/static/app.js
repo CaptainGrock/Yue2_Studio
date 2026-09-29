@@ -111,8 +111,8 @@ function composeStyle(base,prefix){
   if(moods.length)parts.push(moods.join(', ')+' mood');
   const bpm=tempoState(prefix);
   if(bpm)parts.push(bpm+' BPM');
-  const voice=$(prefix==='create'?'createVoice':prefix+'Voice')?.value||'';
-  if(voice&&voice!=='any'&&VOICES.length){const v=VOICES.find(v=>v.id===voice);if(v)parts.unshift(v.label);}
+  // Voice is NOT composed here: the server owns vocal placement (VOICE_TAG
+  // first, VOICE_TAG_SUFFIX last) from the separate voice field.
   if(!parts.length)return base;
   return [base,parts.join(', ')].filter(Boolean).join(', ');
 }
@@ -178,7 +178,7 @@ function requestData(){const seed=$('seed').value.trim();if(!/^[0-9]{1,19}$/.tes
 const voice=voiceSel?voiceSel.value:'';
 let lyrics=$('lyrics').value;
 if(voice==='instrumental')lyrics='[Intro]\n\n[Interlude]\n\n[Outro]\n';
-const request={style:composeStyle($('style').value,'create'),lyrics:lyrics,cot:$('planMode').value,seed,id:'song'};if($('abc').value.trim())request.abc=$('abc').value;return {title:$('songTitle').value,mode:state.mode,stage:'audio',request,settings:state.settings,source_job:state.sourceJob};}
+const request={style:composeStyle($('style').value,'create'),lyrics:lyrics,cot:$('planMode').value,seed,id:'song'};if($('abc').value.trim())request.abc=$('abc').value;return {title:$('songTitle').value,mode:state.mode,stage:'audio',request,settings:state.settings,source_job:state.sourceJob,voice:voice&&voice!=='any'?voice:''};}
 async function generate(stage){await busy(stage==='plan'?'planButton':'generateButton',async()=>{const payload=requestData();payload.stage=stage;const job=await api('/api/generate',payload);state.activeId=job.id;save();await poll();toast((stage==='plan'?'Plan':'Song')+' added to the GPU queue.');},'Adding to queue…');}
 const statusText={queued:'Queued',running:'Rendering',cancelling:'Stopping…',complete:'Complete',cancelled:'Cancelled',failed:'Failed',needs_review:'Review ending',interrupted:'Interrupted'};
 function libraryFilterMatches(job,filter){if(filter==='all')return true;if(filter==='starred')return job.starred===true;const song=job.kind==='generation'&&job.stage==='audio';if(!song)return false;const gguf=job.backend==='audio.cpp';if(filter==='completed')return ['complete','needs_review'].includes(job.status);if(filter==='gguf')return gguf;if(filter==='torch')return !gguf;if(filter==='failed')return job.status==='failed';if(filter==='active')return ['running','queued','cancelling'].includes(job.status);return false;}
@@ -424,6 +424,8 @@ function bindSurprise() {
         ...(state.boot.surprise_style_lock?{lock_style:$('surpriseLockStyle').checked}:{}),
         count, ...(state.boot.profanity_check?{profanity:$('surpriseProfanity').value}:{}), voice: $('surpriseVoice').value,
         style: composeStyle($('surpriseStyle').value,'surprise'),
+        // Voice arrives as an id; the server composes the enforced style text
+        // (VOICE_TAG first, VOICE_TAG_SUFFIX last) so both panels behave alike.
         language: $('surpriseLanguage').value, length: $('surpriseLength').value,
         ...( $('surpriseLength').value==='custom' ? {custom_length: songLengthSeconds()} : {} ),
         brief: $('brief').value,

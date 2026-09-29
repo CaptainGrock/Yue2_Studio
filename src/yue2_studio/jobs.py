@@ -82,8 +82,9 @@ def score_check(text, strip=False, keep_voice='both'):
 
 
 def generation_spec(payload):
-    if set(payload)-{'title','mode','stage','request','settings','source_job','lora'}:
+    if set(payload)-{'title','mode','stage','request','settings','source_job','lora','voice'}:
         raise ValueError('Unknown generation fields.')
+    voice=payload.get('voice') or ''
     settings = validate_settings(payload.get('settings',{}))
     request = dict(payload.get('request',{}))
     allowed = {'style','lyrics','cot','seed','abc','cfg_scale','id'}
@@ -118,8 +119,27 @@ def generation_spec(payload):
         score = parse_abc(req.abc)
         if req.cot=='melody' and any(v.chords for v in score.voices.values()):
             raise ValueError('The score still contains chords. Use Prepare melody, or choose Full to retain harmony.')
-    return {**({'lora':lora} if lora else {}), 'request':req.to_dict(),'settings':settings,'stage':stage,'mode':mode,
-            'title':str(payload.get('title') or 'Untitled song')[:180], 'source_job':str(payload.get('source_job') or '')[:100]}
+    if voice:
+        # Server-side voice enforcement for the create panel: the audio model
+        # weights early [Tags] tokens most, so the vocal descriptor leads and a
+        # suffix reinforces it. This only rewrites the style text; the rest of
+        # the validated request is untouched.
+        from .surprise import voice_style_enhancement, voice_cfg
+        enhanced = voice_style_enhancement(req.style, voice)
+        if enhanced != req.style:
+            req = SongRequest(**{**req.to_dict(),'style':enhanced})
+    request_dict = req.to_dict()
+    if voice:
+        cfg = voice_cfg(voice, settings)
+        if cfg is not None:
+            # Modest guidance bump so the render adheres to the vocal tags.
+            request_dict['cfg_scale'] = cfg
+    result = {'request':request_dict,'settings':settings,'stage':stage,'mode':mode,
+              'title':str(payload.get('title') or 'Untitled song')[:180],
+              'source_job':str(payload.get('source_job') or '')[:100]}
+    if lora:result['lora']=lora
+    if voice:result['voice']=voice
+    return result
 
 
 class JobManager:
