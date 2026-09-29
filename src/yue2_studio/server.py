@@ -351,6 +351,14 @@ class Handler(BaseHTTPRequestHandler):
                 if original['kind']!='generation' or original['status'] not in ('failed','cancelled','interrupted'):
                     raise ValueError('Only failed, cancelled or interrupted music runs can be retried.')
                 spec=original['input']
+                # Surprise batches scale planner token budgets to the batch's song
+                # length (e.g. 1536 for a one-minute song). A retry is an explicit
+                # second chance at the full engine, not a batch continuation: give
+                # it default budgets so a full-length plan cannot be truncated by
+                # the original batch's cap again.
+                if str(spec.get('source_job') or '').startswith('surprise:'):
+                    spec['settings']['abc'].update(max_tokens=4096,min_tokens=32)
+                    spec['settings']['semantic'].update(max_tokens=9000,min_tokens=200)
                 spec['source_job']=original['id']
                 with self.server.models.lock:
                     if self.server.models.busy(): raise ValueError('Wait for the model download to finish or cancel it first.')
