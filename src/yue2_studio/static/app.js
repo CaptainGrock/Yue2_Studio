@@ -395,7 +395,13 @@ async function useRun(job,withScore){
     if(!input){toast('This run has no saved request to load.',true);return;}
     const source={...job,input};
     if(job.kind==='transcription'){$('abc').value=input.request.abc||job.abc||'';state.sourceJob=job.id;setMode('cover');$('scoreDetails').open=true;$('planMode').value=(input.request.settings&&input.request.settings.transcription&&input.request.settings.transcription.task)==='full'?'full':'melody';state.upload={upload_id:input.request.upload_id,name:job.title};updateUpload();}
-    else{const request=input.request;restoreProject({title:input.title,...request,settings:input.settings,mode:input.mode,connection:undefined,instructions:$('writingInstructions').value});if(withScore)$('abc').value=job.abc;state.sourceJob=job.id;$('scoreDetails').open=Boolean($('abc').value);}
+    else{const request=input.request;let settings=input.settings;
+      // Surprise batches scale the planner's token budget to the requested song
+      // length (e.g. 1536 for a one-minute song). Those caps belong to the batch
+      // run only; inheriting them into the interactive draft silently truncates
+      // every later full-length plan at the old cap.
+      if(String(input.source_job||'').startsWith('surprise:')&&state.boot?.defaults){settings={...settings,abc:clone(state.boot.defaults.abc),semantic:clone(state.boot.defaults.semantic)};}
+      restoreProject({title:input.title,...request,settings,mode:input.mode,connection:undefined,instructions:$('writingInstructions').value});if(withScore)$('abc').value=job.abc;state.sourceJob=job.id;$('scoreDetails').open=Boolean($('abc').value);}
     updateMode();renderAbcSheet();if($('abc').value.trim()){message('scoreResult','Score copied into the editor. It will be used AS-IS: the planner is bypassed, so new seeds and styles render the same melody. Clear the ABC field for fresh compositions.');}else{message('scoreResult','');}$('runDialog').close();setRunEditing(false);switchView('create');save();toast($('abc').value.trim()?'Run loaded. The copied score will pin the melody.':'Run loaded into the editor.');
   };
   maybeReplace('Load this run into the editor?','This copies the selected run into your current draft. Save your project first if you want to keep the current version.',apply);
