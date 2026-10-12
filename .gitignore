@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .venv-artist/
 .artist-runtimes/
+SheetSage2-venv/
 training/
 datasets/
 hf_modules_artist/
