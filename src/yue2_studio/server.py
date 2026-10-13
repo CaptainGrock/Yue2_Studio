@@ -511,6 +511,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type',mime)
         self.send_header('Content-Length',str(max(0,end-start+1)))
         self.send_header('Accept-Ranges','bytes')
+        if path.suffix in ('.js','.html','.css','.svg'):
+            # Studio JS/HTML changes must reach the browser immediately.
+            # Without validators browsers heuristically cache app.js and keep
+            # running stale copies (e.g. a fixed SyntaxError that won't die).
+            self.send_header('Cache-Control','no-store')
         if status==206:
             self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
         if download:

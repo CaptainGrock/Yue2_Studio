@@ -246,6 +246,13 @@ class JobManager:
         executable = Path(settings['transcription']['python'])
         if not executable.is_file() or not re.fullmatch(r'python(?:\d+(?:\.\d+)*)?(?:\.exe)?',executable.name,re.I):
             raise ValueError('SheetSage2 Python executable was not found. Check Advanced → Cover transcription.')
+        # Fail fast with a named missing model instead of queuing a job that
+        # can only fail in the worker. Hub IDs (containing '/') are allowed
+        # through; local paths must exist as directories.
+        for key, label in (('model','SheetSage2 model'),('base_model','MERT base model')):
+            location = str(settings['transcription'].get(key) or '')
+            if '/' not in location.replace('\\','/') and not Path(location).is_dir():
+                raise ValueError(label+' folder was not found: '+location+'. Check Advanced → Cover transcription.')
         return self._add('transcription',{'upload_id':upload_id,'settings':settings,'title':str(payload.get('title') or 'Source transcription')[:180]})
 
     def list(self):

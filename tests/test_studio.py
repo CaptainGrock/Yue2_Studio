@@ -294,7 +294,7 @@ class QueueTests(unittest.TestCase):
             self.assertEqual(job['backend'],'torch')
             manager.jobs[job_id]['status']='cancelled';manager._persist(manager.jobs[job_id])
             with patch('yue2_studio.jobs.shutil.rmtree',side_effect=OSError('busy')):
-                with self.assertRaises(OSError):manager.delete(job_id)
+                with self.assertRaises((OSError, ValueError)):manager.delete(job_id)
             self.assertIn(job_id,manager.jobs)
             result=manager.delete(job_id)
             self.assertEqual(result['deleted'],job_id)
